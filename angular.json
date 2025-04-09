@@ -31,6 +31,7 @@
               }
             ],
             "styles": [
+              "node_modules/frappe-gantt/dist/frappe-gantt.css",
               "src/styles.css"
             ],
             "scripts": []
@@ -96,5 +97,8 @@
         }
       }
     }
+  },
+  "cli": {
+    "analytics": "1b6858ed-f538-4b87-aac6-a94077dde1e6"
   }
 }
