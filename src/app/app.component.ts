@@ -1,22 +1,26 @@
-import { Component, AfterViewInit, ElementRef, ViewChild, viewChild} from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component, AfterViewInit, ElementRef, ViewChild,} from '@angular/core';
+//import { RouterOutlet } from '@angular/router';
 import Gantt from 'frappe-gantt'
+import { CommonModule } from '@angular/common';
+import { GanttEditorModule } from './gantt-editor/gantt-editor.module';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet],
+  standalone: false,
   template: `
    <h1>Welcome to {{title}}!</h1>
-    <div #ganttContainer ></div>
-    <router-outlet />
+    
+    <!--<div #ganttContainer ></div>-->
+    <!--<router-outlet />-->
+    <app-schedule-chart></app-schedule-chart>
   `,
   styleUrl: './app.component.css'
 })
-export class AppComponent implements AfterViewInit{
+export class AppComponent /*implements AfterViewInit*/{
   title = 'MoreSchedule';
-  @ViewChild('ganttContainer', {static: true}) ganttContainer!:ElementRef;
+  //@ViewChild('ganttContainer', {static: true}) ganttContainer!:ElementRef;
 
-  ngAfterViewInit(): void {
+  /*ngAfterViewInit(): void {
     const tasks = [
       {
         id: 'Task 1',
@@ -37,5 +41,5 @@ export class AppComponent implements AfterViewInit{
 
     new Gantt(this.ganttContainer.nativeElement, tasks, {container_height: 700});
 
-  }
+  }*/
 }

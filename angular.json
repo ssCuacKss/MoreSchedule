@@ -31,7 +31,8 @@
               }
             ],
             "styles": [
-              "node_modules/frappe-gantt/dist/frappe-gantt.css",
+              
+              "node_modules/@worktile/gantt/styles/index.scss",
               "src/styles.css"
             ],
             "scripts": []
