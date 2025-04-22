@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { Router, RouterModule } from '@angular/router';
+import { Router } from '@angular/router';
 import { FormGroup, FormControl } from '@angular/forms';
 
 
@@ -34,6 +34,6 @@ export class LogInScreenComponent {
 
   public submitInfo(): void{
 
-    this.router.navigate(['/proyectSchdedule'])
+    this.router.navigate(['/Calendar'])
   }
 }

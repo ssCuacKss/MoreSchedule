@@ -33,6 +33,7 @@
             "styles": [
               
               "node_modules/@worktile/gantt/styles/index.scss",
+              "node_modules/angular-calendar/css/angular-calendar.css",
               "src/styles.css"
             ],
             "scripts": []
