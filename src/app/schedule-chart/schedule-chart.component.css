@@ -1,8 +1,12 @@
 .scheduleWindow {
+    margin: 0;
+    padding: 0;
     position: relative;
-    height: 80vh;         
+    height: 97vh;         
     overflow-x: auto;     
     overflow-y: hidden;   
   }
+
+
 
  
