@@ -1,154 +1,180 @@
-import { Component } from '@angular/core';
-import { GanttItem, GanttViewType} from '@worktile/gantt';
+import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject } from '@angular/core';
+import { gantt } from 'dhtmlx-gantt';
+import 'dhtmlx-gantt/codebase/dhtmlxgantt.css';
+import { ProyectTasksService } from '../proyect-tasks.service';
+import { DataBaseRawData } from '../data-base-raw-data';
+import { withDebugTracing } from '@angular/router';
+
 
 @Component({
   selector: 'app-schedule-chart',
-  standalone: false,
-  template: `
-    <div class="scheduleWindow">
-      <ngx-gantt #gantt [items]="items" [viewType]='view' [start]="start" [end]="end">
-        <ngx-gantt-table>
-          <ngx-gantt-column name="Titulo" width="300px">
-            <ng-template #cell let-item="item"> {{ item.title }} </ng-template>
-          </ngx-gantt-column>
-        </ngx-gantt-table>
-      </ngx-gantt>
-      
-    <div>
-
-  `,
-  styleUrl: './schedule-chart.component.css'
+  encapsulation: ViewEncapsulation.None,
+  template: `<div #ganttContainer class="scheduleWindow"></div>`,
+  styleUrls: ['./schedule-chart.component.css']
 })
-export class ScheduleChartComponent{
+export class ScheduleChartComponent implements OnInit {
+  tasksService: ProyectTasksService = inject(ProyectTasksService);
+  tasksList: DataBaseRawData[] = [];
 
-  view = GanttViewType.hour;
-  start = new Date('2025-07-28').getTime();
-  end = new Date('2025-08-02').getTime();
-  drag = false;
+  @ViewChild('ganttContainer', { static: true })
+  ganttContainer!: ElementRef;
 
-  items: GanttItem[] = [
-    {
-      id: '000000',
-      title: 'Task 0',
-      start: new Date('2025-07-28T08:00:00'),
-      end: new Date('2025-07-28T17:00:00'),
-      expandable: true,
-      draggable: true,
-      links: [{type: 1, link: '000001', color: 'black'}],
-      color: "green"
-    },
-    {
-      id: '000001',
-      title: 'Task 1',
-      start: new Date('2025-07-28T18:00:00'),
-      end: new Date('2025-07-28T19:30:00'),
-      expandable: true,
-      draggable: true
-    },{
-      id: '000002',
-      title: 'Task 0',
-      start: new Date('2025-07-28T08:00:00'),
-      end: new Date('2025-07-28T17:00:00'),
-      expandable: true,
-      draggable: true,
-      links: [{type: 1, link: '000003', color: 'black'}],
-      color: "green"
-    },
-    {
-      id: '000003',
-      title: 'Task 1',
-      start: new Date('2025-07-28T18:00:00'),
-      end: new Date('2025-07-28T19:30:00'),
-      expandable: true,
-      draggable: true
-    },{
-      id: '000004',
-      title: 'Task 0',
-      start: new Date('2025-07-28T08:00:00'),
-      end: new Date('2025-07-28T17:00:00'),
-      expandable: true,
-      draggable: true,
-      links: [{type: 1, link: '000005', color: 'black'}],
-      color: "green"
-    },
-    {
-      id: '000005',
-      title: 'Task 1',
-      start: new Date('2025-07-28T18:00:00'),
-      end: new Date('2025-07-28T19:30:00'),
-      expandable: true,
-      draggable: true
-    },{
-      id: '000006',
-      title: 'Task 0',
-      start: new Date('2025-07-28T08:00:00'),
-      end: new Date('2025-07-28T17:00:00'),
-      expandable: true,
-      draggable: true,
-      links: [{type: 1, link: '000007', color: 'black'}],
-      color: "green"
-    },
-    {
-      id: '000007',
-      title: 'Task 1',
-      start: new Date('2025-07-28T18:00:00'),
-      end: new Date('2025-07-28T19:30:00'),
-      expandable: true,
-      draggable: true
-    },{
-      id: '000008',
-      title: 'Task 0',
-      start: new Date('2025-07-28T08:00:00'),
-      end: new Date('2025-07-28T17:00:00'),
-      expandable: true,
-      draggable: true,
-      links: [{type: 1, link: '000009', color: 'black'}],
-      color: "green"
-    },
-    {
-      id: '000009',
-      title: 'Task 1',
-      start: new Date('2025-07-28T18:00:00'),
-      end: new Date('2025-07-28T19:30:00'),
-      expandable: true,
-      draggable: true
-    },{
-      id: '000010',
-      title: 'Task 0',
-      start: new Date('2025-07-28T08:00:00'),
-      end: new Date('2025-07-28T17:00:00'),
-      expandable: true,
-      draggable: true,
-      links: [{type: 1, link: '000011', color: 'black'}],
-      color: "green"
-    },
-    {
-      id: '000011',
-      title: 'Task 1',
-      start: new Date('2025-07-28T18:00:00'),
-      end: new Date('2025-07-28T19:30:00'),
-      expandable: true,
-      draggable: true
-    },{
-      id: '000012',
-      title: 'Task 0',
-      start: new Date('2025-07-28T08:00:00'),
-      end: new Date('2025-07-28T17:00:00'),
-      expandable: true,
-      draggable: true,
-      links: [{type: 1, link: '000013', color: 'black'}],
-      color: "green"
-    },
-    {
-      id: '000013',
-      title: 'Task 1',
-      start: new Date('2025-07-28T18:00:00'),
-      end: new Date('2025-07-28T19:30:00'),
-      expandable: true,
-      draggable: true
+  ngOnInit(): void {
+    gantt.config.date_format = '%Y-%m-%d %H:%i';
+
+
+    gantt.config.start_date = new Date(2025, 0, 1);
+    gantt.config.end_date = gantt.date.add(gantt.config.start_date, 15, 'day');
+
+    gantt.config.scales = [
+      { unit: 'day',  step: 1, format: '%d %M' },
+      { unit: 'hour', step: 1, format: '%H:%i' }
+    ];
+    gantt.config.scale_height     = 50;
+    gantt.config.min_column_width = 100;
+    gantt.config.columns= [
+      
+      {name: "start_date", label: "Inicio", align: "center"},
+      {name: "end_date", label: "Fin", align: "center"},
+      {name: "add", label: ''}
+    ];
+
+    gantt.config.duration_unit = 'hour';
+    gantt.config.duration_step = 1;
+
+    gantt.config.lightbox.sections = [
+      { name: 'Nombre', type: 'textarea', map_to: 'text', height: 35, focus: true },
+      {
+        name: 'Periodo',
+        type: 'time',
+        map_to: 'auto',
+        time_format: ['%d', '%m', '%Y', '%H:%i'],
+        year_range: [2020, 2030],
+        height: 72,
+        autofix_end: true
+      },
+      { name: 'Descripción', type: 'textarea', map_to: 'details', height: 50 }
+    ];
+
+    gantt.init(this.ganttContainer.nativeElement);
+
+    const items = {data: [
+        { id: 1, text: 'Tarea principal', start_date: '2025-01-01 18:00', end_date: '2025-01-01 19:00', type:"baseline"},
+        { id: 2, text: 'Subtarea', start_date: '2025-01-01 20:20', end_date: '2025-01-01 21:00' }
+      ], links: [
+        {id: 1, source: 1, target: 2, type: '0'}
+      ]
+    };
+
+    gantt.parse(items);
+  }
+  
+  constructor() {
+    this.tasksService.GetProyectTasks().then((tasksList: DataBaseRawData[]) => {
+      this.tasksList = tasksList;
+      this.processRawDataMontaje();
+    }); 
+  }
+
+  private processRawDataMontaje(){
+
+    let size: number = this.tasksList.length;
+    for(let i = 0 ; i < size - 1; i++){
+      if(this.tasksList[i].ID.includes(this.tasksList[i+1].ID)){
+        this.tasksList.splice(i+1,1);
+        --size;
+      }
     }
-  ];
 
-  constructor() {}
+    console.log(this.tasksList);
 
+    const filteredDataLvlmax: DataBaseRawData[] = this.tasksList.filter(
+      element => (element.Nv === 1 || element.Nv === 2) && element.Tipo == "T"
+    );
+    let filteredDataLvlmaxCopy = [...filteredDataLvlmax].reverse();
+    let lastLevel: number = filteredDataLvlmax[filteredDataLvlmax.length-1].Nv;
+
+
+    let StartingLevel: boolean = true;
+    filteredDataLvlmax.forEach(element => {
+      
+    });
+
+  }
+
+
+  /*private processRawData(){
+    let size: number = this.tasksList.length;
+    for(let i = 0 ; i < size - 1; i++){
+      if(this.tasksList[i].ID.includes(this.tasksList[i+1].ID)){
+        this.tasksList.splice(i+1,1);
+        --size;
+      }
+    }
+    //let prevNv = this.tasksList.filter(element => element.Nv === 6);
+    let startHour: Date = new Date(this.start);
+    for (let d = 4; d > 0; d--){
+      //console.log(d);
+      let levelTasks: DataBaseRawData[] = this.tasksList.filter(element => element.Nv === d && element.Tipo === "T");
+      //levelTasks.reverse();
+      //console.log(levelTasks);
+      //let startHour: Date = new Date(this.start);
+
+      for(let i = 0; i < levelTasks?.length; i++){
+        let task!: GanttItem;
+        console.log(`estoy en la tarea ${levelTasks[i].ID}`)
+        if(levelTasks[i].ArtRecurso != "" ){
+          let confase = levelTasks[i].ArtRecurso.split('_');
+          console.log(confase);
+          if(confase.length == 2){
+            let precursors = this.tasksList!.find( element => {
+              let returnValue = null;
+              if(element.Conjunto.toString().includes(confase[0]) && element.Fase.includes(confase[1])){
+                returnValue = element;
+              }
+              return returnValue;
+            });
+            //console.log(precursors);
+            task = {
+              id: levelTasks[i].ID,
+              title: levelTasks[i].nomConjunto + " " + levelTasks[i].nomFase + " " + levelTasks[i].Conjunto,
+              start: startHour.getTime(),
+              end: addHours(startHour, 1).getTime(),
+              links: [{type: 4, link: precursors!.ID, color: 'black'}]
+            }
+          }else if(confase.length == 1){
+            let temp = [...this.tasksList].reverse();
+            let last = temp.find(element => element.Conjunto === confase[0]);
+            console.log(last);
+            task = {
+              id: levelTasks[i].ID,
+              title: `${levelTasks[i].nomConjunto} ${levelTasks[i].nomFase} ${levelTasks[i].Conjunto}`,
+              start: startHour.getTime(),
+              end: addHours(startHour, 1).getTime(),
+              links: [{ type: 4, link: last!.ID, color: 'black' }]
+            };
+          }
+        }else{
+          task = {
+            id: levelTasks[i].ID,
+            title: levelTasks[i].nomConjunto + " " + levelTasks[i].nomFase + " " + levelTasks[i].Conjunto,
+            start: startHour.getTime(),
+            end: addHours(startHour, 1).getTime()
+          }
+        }
+        this.items = [...this.items, task];
+        startHour = task.end ? new Date(task.end) : new Date();
+        //prevNv = [...levelTasks].reverse();
+      }
+      //console.log(this.items);
+      //console.log(this.tasksList);
+    }
+  }
+    
+    lastReference(): DataBaseRawData{
+    let retVal:DataBaseRawData = this.tasksList[0];
+
+    return retVal ?? {};
+    }
+  */
 }

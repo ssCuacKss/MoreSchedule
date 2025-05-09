@@ -1,0 +1,34 @@
+export interface DataBaseRawData {
+    Documento: string;
+    Tipo: string;
+    Nv: number;
+    Conjunto: string;
+    Fase: string;
+    Pedidas: number;
+    '#Ord': number;
+    Ordenado: number;
+    Fabricado: number;
+    Artículo_Fase: string;
+    'Und/Kg/Mt': number;
+    'Stock Art': number;
+    Maquina: string;
+    ArtRecurso: string;
+    nomMaquina: string;
+    nomFase: string;
+    nomArticulo: string;
+    nomConjunto: string;
+    Usuario: number;
+    ID: string;
+    Fase_ArtFas: string;
+    Merma: number;
+    Tiempo_Línea: number;
+    Tiempo_Conjunto: number;
+    TiempoPedidas: number;
+    MedidaArtFase: string;
+    Arbol: string;
+    GRUPO_SUPERIOR_FAB_Conj: string;
+    'Stock Conjunto': number;
+    Descompuesto: string;
+    IDReg: number;
+    FabSiNo: number;
+}

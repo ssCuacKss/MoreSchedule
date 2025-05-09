@@ -1,0 +1,14 @@
+.calendar-controls {
+    display: flex;
+    align-items: center; 
+    justify-content: center; 
+    gap: 10px; 
+  }
+  
+  .calendar-controls p {
+    margin: 0;
+  }
+
+  .calendar{
+    height: 85vh;
+  }

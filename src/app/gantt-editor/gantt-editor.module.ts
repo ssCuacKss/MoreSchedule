@@ -1,6 +1,4 @@
-import { CommonModule } from '@angular/common';
 import { LOCALE_ID, NgModule } from '@angular/core';
-import {GANTT_GLOBAL_CONFIG, NgxGanttModule} from '@worktile/gantt'
 import { AppComponent } from '../app.component';
 import { ScheduleChartComponent } from '../schedule-chart/schedule-chart.component';
 import { BrowserModule } from '@angular/platform-browser';
@@ -11,18 +9,15 @@ import { ReactiveFormsModule} from '@angular/forms';
 import {CalendarModule, DateAdapter, MOMENT} from 'angular-calendar';
 import {SchedulerModule} from 'angular-calendar-scheduler';
 import {adapterFactory} from 'angular-calendar/date-adapters/moment'
-
 import moment from 'moment';
 
 @NgModule({
   declarations: [
     AppComponent,             
-    ScheduleChartComponent,
     LogInScreenComponent   
   ],
   imports: [
     BrowserModule,
-    NgxGanttModule,
     RouterOutlet,
     RouterModule,
     ReactiveFormsModule,
@@ -35,13 +30,7 @@ import moment from 'moment';
     SchedulerModule.forRoot({ locale: 'en', headerDateFormat: 'daysRange' })
   
   ],
-  providers: [
-    {
-      provide: GANTT_GLOBAL_CONFIG,
-      useValue: {
-        locale: 'en-us'
-      }
-    },
+  providers:[
     {
       provide: LOCALE_ID, useValue: 'en-US'
     },
