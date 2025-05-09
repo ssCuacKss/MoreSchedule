@@ -1,9 +1,10 @@
-import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject } from '@angular/core';
+import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject, LOCALE_ID } from '@angular/core';
 import { gantt } from 'dhtmlx-gantt';
 import 'dhtmlx-gantt/codebase/dhtmlxgantt.css';
 import { ProyectTasksService } from '../proyect-tasks.service';
 import { DataBaseRawData } from '../data-base-raw-data';
-import { withDebugTracing } from '@angular/router';
+import {} from '@angular/common/locales/es'
+import { registerLocaleData } from '@angular/common';
 
 
 @Component({
@@ -20,8 +21,10 @@ export class ScheduleChartComponent implements OnInit {
   ganttContainer!: ElementRef;
 
   ngOnInit(): void {
+    
+    gantt.i18n.setLocale('es');
+     
     gantt.config.date_format = '%Y-%m-%d %H:%i';
-
 
     gantt.config.start_date = new Date(2025, 0, 1);
     gantt.config.end_date = gantt.date.add(gantt.config.start_date, 15, 'day');
@@ -30,7 +33,7 @@ export class ScheduleChartComponent implements OnInit {
       { unit: 'day',  step: 1, format: '%d %M' },
       { unit: 'hour', step: 1, format: '%H:%i' }
     ];
-    gantt.config.scale_height     = 50;
+    gantt.config.scale_height = 50;
     gantt.config.min_column_width = 100;
     gantt.config.columns= [
       
@@ -73,6 +76,7 @@ export class ScheduleChartComponent implements OnInit {
     this.tasksService.GetProyectTasks().then((tasksList: DataBaseRawData[]) => {
       this.tasksList = tasksList;
       this.processRawDataMontaje();
+
     }); 
   }
 

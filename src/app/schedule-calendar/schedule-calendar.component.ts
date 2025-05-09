@@ -3,9 +3,12 @@ import { CalendarDateFormatter, CalendarEvent, CalendarModule, DateAdapter } fro
 import { SchedulerDateFormatter, SchedulerModule } from 'angular-calendar-scheduler';
 import { startOfDay, addHours, addMonths, subMonths } from 'date-fns';
 import { Router } from '@angular/router';
-import { CommonModule } from '@angular/common';
+import { CommonModule, registerLocaleData } from '@angular/common';
 import { adapterFactory } from 'angular-calendar/date-adapters/moment';
 import  moment from 'moment';
+import localeEs from '@angular/common/locales/es'
+
+
 
 @Component({
   selector: 'app-schedule-calendar',
@@ -35,7 +38,7 @@ import  moment from 'moment';
     },
     {
       provide: LOCALE_ID,
-      useValue: 'en-US'
+      useValue: 'es'
     }
   ]
 })
@@ -64,7 +67,7 @@ export class ScheduleCalendarComponent  {
   ];
 
   constructor(private router: Router){
-
+    registerLocaleData(localeEs);
   }
 
   previousMonth(): void {
