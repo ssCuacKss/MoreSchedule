@@ -1,12 +1,15 @@
-import { Component } from '@angular/core';
-import { CalendarDateFormatter, CalendarEvent, CalendarModule} from 'angular-calendar';
-import { SchedulerDateFormatter } from 'angular-calendar-scheduler';
+import { Component, LOCALE_ID } from '@angular/core';
+import { CalendarDateFormatter, CalendarEvent, CalendarModule, DateAdapter } from 'angular-calendar';
+import { SchedulerDateFormatter, SchedulerModule } from 'angular-calendar-scheduler';
 import { startOfDay, addHours, addMonths, subMonths } from 'date-fns';
 import { Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { adapterFactory } from 'angular-calendar/date-adapters/moment';
+import  moment from 'moment';
 
 @Component({
   selector: 'app-schedule-calendar',
-  imports: [CalendarModule],
+  imports: [CommonModule ,CalendarModule, SchedulerModule],
   template: `
     
     <div style="padding: 1rem;" class="calendar">
@@ -29,6 +32,10 @@ import { Router } from '@angular/router';
     {
       provide: CalendarDateFormatter,
       useClass: SchedulerDateFormatter
+    },
+    {
+      provide: LOCALE_ID,
+      useValue: 'en-US'
     }
   ]
 })

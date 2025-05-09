@@ -1,14 +1,6 @@
-@import 'dhtmlx-gantt/codebase/dhtmlxgantt.css';
 
 .scheduleWindow {
   height: 97vh;
   width: 100%;
 
 }
-
-/*button {
-  position: absolute;
-  z-index: 10;
-  top: 1px;
-  left: 1px;
-}*/

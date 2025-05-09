@@ -1,8 +1,11 @@
 import { Component} from '@angular/core';
+import { provideRouter, RouterModule, RouterOutlet } from '@angular/router';
+import routeConfig from './routes';
 
 @Component({
   selector: 'app-root',
-  standalone: false,
+  imports: [RouterOutlet, RouterModule],
+  standalone: true,
   template: `
     <router-outlet></router-outlet>
   `,

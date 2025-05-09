@@ -1,11 +1,14 @@
 import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormGroup, FormControl } from '@angular/forms';
+import { ReactiveFormsModule } from '@angular/forms';
+import { CommonModule } from '@angular/common';
 
 
 @Component({
   selector: 'app-log-in-screen',
-  standalone: false,
+  imports: [ReactiveFormsModule, CommonModule],
+  standalone: true,
   template: `
     <div class="loginInfo">
       <form [formGroup]="loginInfo" (submit)="submitInfo()">
