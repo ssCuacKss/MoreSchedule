@@ -23,3 +23,36 @@ input[type=submit]{
     left: 50%;
     transform: translate(-50%);
 }
+
+.passwordField{
+    width: 92%;
+    margin: 0;
+    padding: 0;
+    border: 0px;
+}
+
+.passwordField{
+    border: none;
+    outline: none;
+}
+
+.passwordCheck{
+    margin: 0;
+    padding: 0;
+    border: 0px;
+    margin-left: 10px;
+}
+
+.togglePass{
+    border: 1px solid rgb(60, 60, 60);
+    border-radius: 2px;
+    display: flex;
+    flex-wrap: nowrap;
+    padding: 2px;
+
+    
+}
+
+.togglePass:focus-within{
+    outline: auto;
+}

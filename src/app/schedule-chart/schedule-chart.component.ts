@@ -4,7 +4,6 @@ import 'dhtmlx-gantt/codebase/dhtmlxgantt.css';
 import { ProyectTasksService } from '../proyect-tasks.service';
 import { DataBaseRawData } from '../data-base-raw-data';
 import {} from '@angular/common/locales/es'
-import { registerLocaleData } from '@angular/common';
 
 
 @Component({
@@ -31,10 +30,24 @@ export class ScheduleChartComponent implements OnInit {
 
     gantt.config.scales = [
       { unit: 'day',  step: 1, format: '%d %M' },
-      { unit: 'hour', step: 1, format: '%H:%i' }
+      { unit: 'hour', step: 1, format: '%H:%i' },
+      
     ];
+
+    gantt.config['subscales'] = [
+      { unit: 'minute', step: 15, format: '%H:%i'}
+    ]
+
+
     gantt.config.scale_height = 50;
-    gantt.config.min_column_width = 100;
+    gantt.config.min_column_width = 45;
+
+    gantt.config.duration_unit = 'minute';
+    gantt.config.duration_step = 1;
+    gantt.config.time_step = 5;
+    gantt.config.round_dnd_dates = false;
+    gantt.config.min_duration    = 1 * 60 * 1000;
+
     gantt.config.columns= [
       
       {name: "start_date", label: "Inicio", align: "center"},
@@ -42,8 +55,6 @@ export class ScheduleChartComponent implements OnInit {
       {name: "add", label: ''}
     ];
 
-    gantt.config.duration_unit = 'hour';
-    gantt.config.duration_step = 1;
 
     gantt.config.lightbox.sections = [
       { name: 'Nombre', type: 'textarea', map_to: 'text', height: 35, focus: true },

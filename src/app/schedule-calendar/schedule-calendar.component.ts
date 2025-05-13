@@ -4,11 +4,7 @@ import { SchedulerDateFormatter, SchedulerModule } from 'angular-calendar-schedu
 import { startOfDay, addHours, addMonths, subMonths } from 'date-fns';
 import { Router } from '@angular/router';
 import { CommonModule, registerLocaleData } from '@angular/common';
-import { adapterFactory } from 'angular-calendar/date-adapters/moment';
-import  moment from 'moment';
-import localeEs from '@angular/common/locales/es'
-
-
+import localeEs from '@angular/common/locales/es';
 
 @Component({
   selector: 'app-schedule-calendar',

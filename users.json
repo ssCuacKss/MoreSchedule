@@ -1,0 +1,19 @@
+{
+    "users": [
+        {
+            "uname": "pablo",
+            "pass" : "pablo",
+            "admin" : true
+        },
+        {
+            "uname": "paco",
+            "pass" : "perico123",
+            "admin" : true
+        },
+        {
+            "uname": "juan",
+            "pass": "palomo",
+            "admin": false
+        }
+    ]
+}

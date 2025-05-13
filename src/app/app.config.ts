@@ -2,6 +2,7 @@ import { ApplicationConfig, LOCALE_ID, provideZoneChangeDetection } from '@angul
 import { provideRouter } from '@angular/router';
 
 import routeConfig from './routes';
+
 export const appConfig: ApplicationConfig = {
   providers: [provideZoneChangeDetection({ eventCoalescing: true }), provideRouter(routeConfig)]
 };

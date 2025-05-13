@@ -16796,5 +16796,27 @@
         "IDReg": 17537,
         "FabSiNo": 0
     }
+    ],
+    "users": [
+        {
+            "uname": "pablo",
+            "pass" : "Pablo123",
+            "admin" : true
+        },
+        {
+            "uname": "paco",
+            "pass" : "Perico123",
+            "admin" : true
+        },
+        {
+            "uname": "juan",
+            "pass": "Palomo2",
+            "admin": false
+        },
+        {
+            "uname": "josechu",
+            "pass": "More2024siL",
+            "admin": true
+        }
     ]
 }
