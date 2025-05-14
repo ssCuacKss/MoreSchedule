@@ -1,14 +1,98 @@
-.calendar-controls {
-    display: flex;
-    align-items: center; 
-    justify-content: center; 
-    gap: 10px; 
-  }
-  
-  .calendar-controls p {
-    margin: 0;
-  }
+.calendar{
+  font-family: Verdana, Geneva, Tahoma, sans-serif;
+}
 
-  .calendar{
-    height: 85vh;
-  }
+.calendar-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2.2rem;          
+  margin-top: 5px;
+}
+
+.calendar-controls button{
+  border: none;
+  height: 4.4rem;
+  background-color: #0d6efd;
+  color:white;
+  width: 8.5rem;
+  font-size: 150%;
+}
+
+#prevMonth{
+  border-top-left-radius: 30px;
+  border-bottom-left-radius: 30px;
+}
+
+#nextMonth{
+  border-top-right-radius: 30px;
+  border-bottom-right-radius: 30px;
+}
+
+.calendar-controls p {
+  margin: 0;
+  display: flex;
+  flex-direction: column; 
+  align-items: center;
+  font-size: 2rem;
+  font-weight: bolder;
+  font-family: 'Lucida Sans', Verdana, sans-serif;
+}
+
+.calendarMenu{
+  list-style-type: none;
+  display:flex;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-bottom: 1px solid black;
+}
+
+.item{
+  margin: 2px;
+  padding-right: 5px;
+  padding-left: 5px;
+  text-align: center;
+  font-size: large;
+  font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+  
+}
+
+.item:hover{
+  border-radius: 5px;
+  background-color: lightgray;
+  cursor:default;
+  user-select: none;
+}
+
+.dropdown{
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  position: absolute;
+  border: 1px solid black;
+  margin-top: 2pt;
+  width: 15rem;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  text-align: left;
+  background-color: whitesmoke;
+}
+.dropdown li{
+  padding-left: 5px;
+  padding-top: 5px;
+
+}
+
+.dropdown li ~ li{
+  border-top: 1px solid black;
+}
+
+.dropdown li:hover{
+  background-color: lightgray;
+}
+
+.closed {
+  visibility: hidden;
+  position: absolute;
+}

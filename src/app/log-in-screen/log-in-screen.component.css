@@ -29,19 +29,18 @@ input[type=submit]{
     margin: 0;
     padding: 0;
     border: 0px;
-}
-
-.passwordField{
     border: none;
     outline: none;
 }
 
+
 .passwordCheck{
     margin: 0;
     padding: 0;
-    border: 0px;
-    margin-left: 10px;
+    margin-left: 20px;
 }
+
+
 
 .togglePass{
     border: 1px solid rgb(60, 60, 60);
