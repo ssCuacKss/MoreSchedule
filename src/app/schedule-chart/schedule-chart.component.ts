@@ -49,9 +49,7 @@ export class ScheduleChartComponent implements OnInit {
     gantt.config.min_duration    = 1 * 60 * 1000;
 
     gantt.config.columns= [
-      
-      {name: "start_date", label: "Inicio", align: "center"},
-      {name: "end_date", label: "Fin", align: "center"},
+      {name: "text", label: "Titulo", align: "center"},
       {name: "add", label: ''}
     ];
 
