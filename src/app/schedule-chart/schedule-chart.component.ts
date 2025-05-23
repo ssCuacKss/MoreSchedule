@@ -149,10 +149,24 @@ export class ScheduleChartComponent implements OnInit {
     //console.log(this.route.snapshot.queryParams['title']);
   }
 
-  public uploadChanges(): void{
+  public async uploadChanges(): Promise<void>{
     const content = gantt.serialize();
+    console.log(content);
     if(this.id !== null){
-          this.tasksService.SaveProyectTasksandLinks(this.id ,content.data, content.links)
+      try {
+
+        await this.tasksService.deleteAllByPidPromise(this.id);
+
+        await this.tasksService.SaveProyectTasksandLinks(
+          this.id,
+          content.data,
+          content.links
+        );
+
+        console.log('Cambios subidos correctamente');
+      } catch (err) {
+        console.error('Error al subir cambios:', err);
+      }
     }
   }
 
@@ -248,78 +262,4 @@ export class ScheduleChartComponent implements OnInit {
 
   }
 
-  /*private processRawData(){
-    let size: number = this.tasksList.length;
-    for(let i = 0 ; i < size - 1; i++){
-      if(this.tasksList[i].ID.includes(this.tasksList[i+1].ID)){
-        this.tasksList.splice(i+1,1);
-        --size;
-      }
-    }
-    //let prevNv = this.tasksList.filter(element => element.Nv === 6);
-    let startHour: Date = new Date(this.start);
-    for (let d = 4; d > 0; d--){
-      //console.log(d);
-      let levelTasks: DataBaseRawData[] = this.tasksList.filter(element => element.Nv === d && element.Tipo === "T");
-      //levelTasks.reverse();
-      //console.log(levelTasks);
-      //let startHour: Date = new Date(this.start);
-
-      for(let i = 0; i < levelTasks?.length; i++){
-        let task!: GanttItem;
-        console.log(`estoy en la tarea ${levelTasks[i].ID}`)
-        if(levelTasks[i].ArtRecurso != "" ){
-          let confase = levelTasks[i].ArtRecurso.split('_');
-          console.log(confase);
-          if(confase.length == 2){
-            let precursors = this.tasksList!.find( element => {
-              let returnValue = null;
-              if(element.Conjunto.toString().includes(confase[0]) && element.Fase.includes(confase[1])){
-                returnValue = element;
-              }
-              return returnValue;
-            });
-            //console.log(precursors);
-            task = {
-              id: levelTasks[i].ID,
-              title: levelTasks[i].nomConjunto + " " + levelTasks[i].nomFase + " " + levelTasks[i].Conjunto,
-              start: startHour.getTime(),
-              end: addHours(startHour, 1).getTime(),
-              links: [{type: 4, link: precursors!.ID, color: 'black'}]
-            }
-          }else if(confase.length == 1){
-            let temp = [...this.tasksList].reverse();
-            let last = temp.find(element => element.Conjunto === confase[0]);
-            console.log(last);
-            task = {
-              id: levelTasks[i].ID,
-              title: `${levelTasks[i].nomConjunto} ${levelTasks[i].nomFase} ${levelTasks[i].Conjunto}`,
-              start: startHour.getTime(),
-              end: addHours(startHour, 1).getTime(),
-              links: [{ type: 4, link: last!.ID, color: 'black' }]
-            };
-          }
-        }else{
-          task = {
-            id: levelTasks[i].ID,
-            title: levelTasks[i].nomConjunto + " " + levelTasks[i].nomFase + " " + levelTasks[i].Conjunto,
-            start: startHour.getTime(),
-            end: addHours(startHour, 1).getTime()
-          }
-        }
-        this.items = [...this.items, task];
-        startHour = task.end ? new Date(task.end) : new Date();
-        //prevNv = [...levelTasks].reverse();
-      }
-      //console.log(this.items);
-      //console.log(this.tasksList);
-    }
-  }
-    
-    lastReference(): DataBaseRawData{
-    let retVal:DataBaseRawData = this.tasksList[0];
-
-    return retVal ?? {};
-    }
-  */
 }

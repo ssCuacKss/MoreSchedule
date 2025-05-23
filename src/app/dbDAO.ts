@@ -7,7 +7,7 @@ import { Proyect } from './proyect';
 import { Task } from './task';
 import { Link } from './link';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, forkJoin } from 'rxjs';
+import { Observable, forkJoin, lastValueFrom} from 'rxjs';
 import {map} from 'rxjs/operators'
 
 @Injectable({
@@ -72,13 +72,61 @@ export class dbDAO {
     return parsedLinks ?? [];
   }
 
-  public async SaveProyectTasksandLinks(id: number, tasks: any, rels: any): Promise<void>{
+  public async SaveProyectTasksandLinks(
+    pid: number,
+    tasks: any[],
+    rels:  any[]
+  ): Promise<void> {
+    const cleanTasks = tasks.map(({ color, end_date, parent, progress, ...t }) => t);
+  // si tus links no tienen esas props, puedes omitir este paso para ellos
+  const cleanRels  = rels; 
 
-    //let data = await fetch("http://localhost:3000/data");
-    //let prueba = data.json();
-    console.log(tasks, rels);
+  // 1) Añadir pid a cada tarea y a cada enlace
+  const tasksWithPid: Task[] = cleanTasks.map(t => ({ ...t, pid }));
+  const linksWithPid:  Link[] = cleanRels.map(l => ({ ...l, pid }));
+
+  // 2) Ejecutar ambos batch en paralelo y esperar resultados
+  const { tasksRes, linksRes } = await lastValueFrom(
+    forkJoin({
+      tasksRes: this.createTasksBatch(tasksWithPid),
+      linksRes: this.createLinksBatch(linksWithPid)
+    })
+  );
+
   }
-  deleteTasksByPid(pid: number): Observable<number> {
+
+  public createTasksBatch(tasks: Task[]): Observable<number> {
+    return this.http.post<number>(
+      `http://localhost:3000/tasks/batch`,
+      tasks
+    );
+  }
+
+  public createLinksBatch(links: Link[]): Observable<number> {
+    return this.http.post<number>(
+      `http://localhost:3000/links/batch`,
+      links
+    );
+  }
+
+  public async deleteAllByPidPromise(pid: number): Promise<{
+    tasksDeleted: number;
+    linksDeleted: number;
+  }> {
+    // Convertimos Observables a Promises
+    const tasksPromise = lastValueFrom(this.deleteTasksByPid(pid));
+    const linksPromise = lastValueFrom(this.deleteLinksByPid(pid));
+
+    // Ejecutamos en paralelo
+    const [tasksDeleted, linksDeleted] = await Promise.all([
+      tasksPromise,
+      linksPromise
+    ]);
+
+    return { tasksDeleted, linksDeleted };
+  }
+
+  public deleteTasksByPid(pid: number): Observable<number> {
     const params = new HttpParams().set('pid', pid.toString());
     return this.http
       .delete<any>(`http://localhost:3000/tasks`, { params })
@@ -86,7 +134,7 @@ export class dbDAO {
   }
 
   /** Borra todos los links cuyo pid coincida */
-  deleteLinksByPid(pid: number): Observable<number> {
+  public deleteLinksByPid(pid: number): Observable<number> {
     const params = new HttpParams().set('pid', pid.toString());
     return this.http
       .delete<any>(`http://localhost:3000/links`, { params })
