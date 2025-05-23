@@ -123,12 +123,14 @@ async function main() {
     });
 
     app.post('/tasks/batch', async (req, res) => {
+        
         const tasks = req.body;
         if (!Array.isArray(tasks) || tasks.length === 0) {
             return res.status(400).json({ error: 'Se espera un array no vacío de tareas' });
         }
 
         for (const t of tasks) {
+            t.pid = parseInt(t.pid);
             if (
                 typeof t.pid !== 'number' ||
                 typeof t.id  !== 'number' ||
@@ -164,7 +166,6 @@ async function main() {
 
     app.post('/links/batch', async (req, res) => {
         const links = req.body;
-
         if (!Array.isArray(links) || links.length === 0) {
             return res
             .status(400)
@@ -172,6 +173,9 @@ async function main() {
         }
    
         for (const l of links) {
+            l.source = parseInt(l.source);
+            l.target = parseInt(l.target);
+            l.pid = parseInt(l.pid);
             if (
                 typeof l.pid    !== 'number' ||
                 typeof l.id     !== 'number' ||
