@@ -4,7 +4,7 @@ import { FormGroup, FormControl } from '@angular/forms';
 import { ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { CookieService } from 'ngx-cookie-service';
-import { ProyectTasksService } from '../proyect-tasks.service';
+import { dbDAO } from '../dbDAO';
 import { ViewChild } from '@angular/core';
 import { User } from '../user';
 
@@ -14,7 +14,7 @@ import { User } from '../user';
   standalone: true,
   template: `
     <div class="loginInfo">
-      <form [formGroup]="loginInfo" (submit)="submitInfo()">
+      <form [formGroup]="loginInfo">
         <label for="areaTextoUsuario">Usuario</label>
         <input type="text" placeholder="Ejemplo: pablo (solo se admiten minusculas)" name="Usuario" id="areaTextoUsuario" formControlName="userName">
         <label for="areaTextoPass">Contraseña</label>
@@ -23,7 +23,7 @@ import { User } from '../user';
           <input type="checkbox" (click)="updateAreaType($event)" class="passwordCheck">
         </div>
         <div class="hidden" #errorMessage></div>
-        <input type="submit" value="Iniciar Sesión"> 
+        <input type="submit" value="Iniciar Sesión" (click)="submitInfo()"> 
       </form>
     </div>
     
@@ -36,7 +36,7 @@ export class LogInScreenComponent {
 
   private router: Router = inject(Router);
   private cookie: CookieService = inject(CookieService);
-  private user: ProyectTasksService = inject(ProyectTasksService);
+  private user: dbDAO = inject(dbDAO);
   @ViewChild('passwordField') passWordField!: ElementRef;
   @ViewChild('errorMessage')  errorMessage!: ElementRef;
 
@@ -66,7 +66,7 @@ export class LogInScreenComponent {
 
   } 
 
-  public async submitInfo(): Promise<void>{
+    public async submitInfo(): Promise<void>{
 
     //this.cookie.set('Test', 'ALLOWEDTOLOGIN', 1);
     let error = (this.errorMessage.nativeElement) as HTMLParagraphElement;
@@ -87,6 +87,7 @@ export class LogInScreenComponent {
 
     //this.router.navigate(['/Calendar'])
   }
+
 
   redirectToPage(user: User){
     if(user.admin){

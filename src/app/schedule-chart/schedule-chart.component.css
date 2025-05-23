@@ -1,6 +1,101 @@
+.header{
+  font-family: 'Lucida Sans', Verdana, sans-serif;
+  display: grid;
+  grid-template-columns: auto auto auto auto;
+  align-items: center;
+}
+
+#proyectName{
+  font-size: x-large;
+  margin-left: 10px;
+  margin-top: 10px;
+  font-weight: 700;
+  width: 25rem;
+  outline: none;
+  border: none;
+  margin-bottom: 10px;
+  border: 2px solid transparent;
+}
+
+#proyectName:hover{
+  border-bottom: 2px solid lightgray;
+}
+
+#proyectName:focus{
+  border-bottom: 2px solid #0d6efd;
+  transition: 0.7s;
+}
+
+#submit{
+  background: inherit;
+  outline: none;
+  border: 1px solid #0d6efd;
+  padding: 10px;
+  border-radius: 5pt;
+  color: #0d6efd;
+  margin-left: 1rem;
+}
+
+#submit:hover{
+  text-decoration: underline;
+}
+
+#submit:active{
+
+  background-color: #024cbd;
+  color: whitesmoke;
+
+}
+
+#return{
+  background: inherit;
+  outline: none;
+  border: 1px solid red;
+  padding: 10px;
+  border-radius: 5pt;
+  color: red;
+  margin-left: 1rem;
+}
+
+#return:hover{
+  text-decoration: underline;
+}
+
+#return:active{
+
+  background-color: rgb(249, 192, 192);
+  color: red;
+
+}
 
 .scheduleWindow {
-  height: 97vh;
+  margin-top: 10px;
+  height: 90vh;
   width: 100%;
 
+}
+
+#CPM {
+  background: inherit;
+  outline: none;
+  border: 1px solid #198754;
+  padding: 10px;
+  border-radius: 5pt;
+  color: #198754;
+  margin-left: 1rem;
+
+}
+
+#CPM:hover {
+  background-color: #198754;  
+  color: #fff;                    
+
+
+}
+
+#CPM:active {
+  background-color: #146c43;
+  color: #fff;
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }

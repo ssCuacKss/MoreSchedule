@@ -1,13 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 
-import { ProyectTasksService } from './proyect-tasks.service';
+import { dbDAO } from './dbDAO';
 
-describe('ProyectTasksService', () => {
-  let service: ProyectTasksService;
+describe('dbDAO', () => {
+  let service: dbDAO;
 
   beforeEach(() => {
     TestBed.configureTestingModule({});
-    service = TestBed.inject(ProyectTasksService);
+    service = TestBed.inject(dbDAO);
   });
 
   it('should be created', () => {

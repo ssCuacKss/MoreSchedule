@@ -22,8 +22,32 @@
 .calendar-controls button:hover {
 
   background-color: #024cbd;
-
   transition: .3s;
+
+}
+
+.removeProyect{
+  background: transparent;
+  margin-left: 10px;
+  outline: none;
+  border: 2px solid white;
+  text-align: center;
+  border-radius: 100%;
+  color: whitesmoke;
+  font-weight: 900;
+  font-size: large;
+  transition: 0.3s;
+}
+
+.removeProyect:hover{
+  background: red;
+  rotate: 360deg;
+  
+
+}
+
+.removeProyect:active{
+  background: darkred;
 
 }
 
@@ -99,7 +123,7 @@
   padding-top: 5px;
 }
 
-.dropdown li~li {
+.dropdown li ~ li {
   border-top: 1px solid black;
 }
 
@@ -161,18 +185,13 @@
 
 }
 
+/*Reglas de visualización de la cabecera*/
+
 .configHeader {
   display: grid;
   grid-template-columns: auto auto 6rem;
 }
-/*
-button:disabled {
-  font-size: 0;
-  border: 0;
-  background: transparent;
-  pointer-events: none;
-}
-*/
+
 .windowName {
   grid-column-start: 1;
   grid-column-end: 2;
@@ -208,9 +227,13 @@ button:disabled {
   text-decoration: underline red 1px;
 }
 
+/*reglas para visualización de cuerpo de las plantllas general*/
+
 .configBody {
   padding: 1.5rem;
 }
+
+/*Reglas para la visualización de la plantilla de configuración de calendario*/
 
 .workHours {
   display: grid;
@@ -226,18 +249,6 @@ button:disabled {
   display: grid;
   grid-template-columns: auto auto auto;
 }
-
-/*
-input:disabled {
-  font-size: 0;
-  border: 0;
-  background: transparent;
-  pointer-events: none;
-  visibility: hidden;
-  height: 0;
-  width: 0;
-}
-*/
 
 .festivos h3{
   padding-top: 2rem;
@@ -323,12 +334,19 @@ input:disabled {
   text-decoration: underline red 1px;
 }
 
+/*reglas para la plantilla de creación de usuario*/
+
 .formulario{
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1rem;
 }
+
+.dataField{
+ align-self: flex-start;
+}
+
 .formulario input{
   width: 100%;
 }
@@ -361,18 +379,19 @@ input[type=submit]{
 }
 
 input[type=submit]:hover{
-  color: #0d6efd;
-  text-decoration: underline #0d6efd 1px;
-  border: 1px solid #024cbd;
-  transition: .2s;
+  border-radius: 5pt;
+  border: 1px solid ;
+  transition: .3s;
+  text-decoration: none;
 }
 
 input[type="submit"]:active{
-  box-shadow: none;
-  background-color: #cddef9;
-  color: #024cbd;
+  background-color: #024cbd;
+  color: #FFFFFF;
+  transition: .3s;
 }
 
+/*Reglas para la visualización de la plantilla editar datos de usuario*/
 .userData{
   display: grid;
   grid-template-columns: auto auto auto auto auto;
@@ -435,4 +454,143 @@ input[type="submit"]:active{
   background-color: rgb(247, 212, 212);
   color: red;
   text-decoration: underline red 1px;
+}
+
+/*Reglas de visualización para la plantilla de edición*/
+.templateData{
+  display: grid;
+  grid-template-columns: auto auto auto ;
+  grid-template-rows: 2rem;
+  text-align: center;
+  column-gap: 6px;
+}
+
+.templateData{
+  border-bottom: 1px solid black;
+}
+
+.templateData:last-child{
+  border: none;
+}
+
+.templateData input{
+  height: 1.5rem;
+}
+
+.listTemplates{
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: 16rem;
+  border: 1px solid black;
+  border-radius: 5pt;
+  padding: .5rem;
+  
+}
+
+.templateData{
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.templateData input[type="button"]{
+  outline: none;
+  border: none;
+  border: 1px solid transparent;
+  border-radius: 5pt;
+  background: inherit;
+  color: #0d6efd;
+  
+}
+
+.templateData input[type="button"]:hover{
+  color: red;
+  text-decoration: underline red 1px;
+  border: 1px solid red;
+  transition: .2s;
+}
+
+.templateData input[type="button"]:active{
+  box-shadow: none;
+  background-color: rgb(247, 212, 212);
+  color: red;
+  text-decoration: underline red 1px;
+}
+
+.confirmChanges{
+  margin-top: 1.3rem;
+  margin-bottom: 10px;
+  position: relative;
+  width: 6rem;
+  left: 50%;
+  transform: translate(-50%);
+  outline: none;
+  border: none;
+  border: 1px solid transparent;
+  border-radius: 5pt;
+  background: inherit;
+  color: #0d6efd;
+  padding: 10px;
+}
+
+#editar{
+  outline: none;
+  border: none;
+  border: 1px solid transparent;
+  border-radius: 5pt;
+  background: inherit;
+  color: #0d6efd;
+}
+
+.confirmChanges:hover, #editar:hover{
+  border-radius: 5pt;
+  border: 1px solid ;
+  transition: .3s;
+  text-decoration: none;
+}
+.confirmChanges:active, #editar:active{
+  background-color: #024cbd;
+  color: #FFFFFF;
+  transition: .3s;
+}
+
+/*Reglas de presentación para plantilla de nuevo proyecto*/
+
+.templateSelect{
+  display: grid;
+  grid-template-columns: auto auto ;
+  grid-template-rows: 2rem;
+  text-align: center;
+  column-gap: 6px;
+}
+
+.templateSelect{
+  border-bottom: 1px solid black;
+}
+
+.templateSelect:last-child{
+  border: none;
+}
+
+.templateSelect input{
+  height: 1.5rem;
+}
+
+.listSelect{
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: 16rem;
+  border: 1px solid black;
+  border-radius: 5pt;
+  padding: .5rem;
+  
+}
+
+.templateSelect{
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.templateSelect h4{
+  margin: 0;
+  margin-top: 5px;
 }
