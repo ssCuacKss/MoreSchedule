@@ -29,6 +29,54 @@ async function main() {
         next();
     }
 
+    app.delete('/proyect/delete', async (req, res) => {
+
+        const pid = parseInt(req.query.pid, 10);
+        if (isNaN(pid)) {
+            return res
+            .status(400)
+            .json({ error: 'pid no válido o faltante' });
+        }
+
+        const result = await db
+            .collection('proyects')
+            .deleteOne({ id: pid });
+
+        return res.json({ deletedCount: result.deletedCount });
+    });
+
+    app.post('/proyect/create', async (req, res) =>{
+        const toInsert = {id: req.body.id, start: req.body.start, end: req.body.end, title: req.body.title, color: req.body.color};
+        
+        try{
+            const proyect = await db
+            .collection('proyects')
+            .insertOne(toInsert)
+
+            return res.status(200).json({inserted: proyect.insertedId})
+        }catch (error){
+            return res.status(500).json({error: error});
+        }
+    });
+
+
+    app.get('/proyect', async (req, res) => {
+        const pid = parseInt(req.query.pid, 10)
+        if(isNaN(pid)){
+            res.status(500).json({error: 'pid no válido o faltante'})
+        }
+        try {
+            const proyects = await db
+            .collection('proyects')
+            .find({id: pid})
+            .toArray();
+            return res.json(proyects);
+        } catch (err) {
+            console.error('Error leyendo proyects:', err);
+            return res.status(500).json({ error: 'Error interno al leer proyectos' });
+        }
+    });
+
     app.delete('/tasks', parsePid, async (req, res) => {
         const result = await db.collection('tasks').deleteMany({ pid: req.pid });
         res.json({ deletedCount: result.deletedCount });

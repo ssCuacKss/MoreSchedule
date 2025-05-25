@@ -1,4 +1,4 @@
-import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject, LOCALE_ID, ɵChangeDetectionSchedulerImpl } from '@angular/core';
+import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject, LOCALE_ID, ɵChangeDetectionSchedulerImpl, AfterViewInit } from '@angular/core';
 import { gantt, } from 'dhtmlx-gantt';
 import { dbDAO } from '../dbDAO';
 import { DataBaseRawData } from '../data-base-raw-data';
@@ -6,6 +6,9 @@ import { ActivatedRoute, Router} from '@angular/router';
 import { CPMTask } from '../cpmtask';
 import { Task } from '../task';
 import { Link } from '../link';
+import { Title } from '@angular/platform-browser';
+import { query } from 'express';
+import { Proyect } from '../proyect';
 
 
 @Component({
@@ -13,7 +16,7 @@ import { Link } from '../link';
   encapsulation: ViewEncapsulation.None,
   template: `
     <div class="header">
-      <input type="text" [value]="nameContent" id="proyectName" placeholder="el campo no puede estar vacío">
+      <input #proyectName type="text" [value]="nameContent" id="proyectName" placeholder="el campo no puede estar vacío">
       <div>
         <input type="button" [value]="saveButtonName" id="submit" (click)="uploadChanges()">
         <input type="button" value="Volver sin Guardar" id="return" (click)="returnToCalendar()">
@@ -25,7 +28,7 @@ import { Link } from '../link';
     `,
   styleUrls: ['./schedule-chart.component.css']
 })
-export class ScheduleChartComponent implements OnInit {
+export class ScheduleChartComponent implements OnInit, AfterViewInit {
 
 
 
@@ -39,10 +42,26 @@ export class ScheduleChartComponent implements OnInit {
   public nameContent: string = "";
   public saveButtonName: string = "";
 
+  @ViewChild('proyectName') proyectNameField!: ElementRef;
+
   @ViewChild('ganttContainer', { static: true }) ganttContainer!: ElementRef;
+
+  async ngAfterViewInit(): Promise<void> {
+
+      if(this.id !== null){
+        const element = await this.tasksService.GetProyect(this.id).then((proyect: Proyect | any) =>{
+              
+            return {id: proyect[0].id, start: proyect[0].start, end: proyect[0].end, title: proyect[0].title, color: proyect[0].color} as Proyect;
+          });
+        this.nameContent = element.title;
+      }
+
+  }
+
   ngOnInit(): void {
     
-    
+
+
     this.id = this.route.snapshot.queryParams['id'] ?? null;
 
     gantt.i18n.setLocale('es');
@@ -103,6 +122,7 @@ export class ScheduleChartComponent implements OnInit {
         this.calculateCriticalPath();
       });
     }
+
   }
   
   private async GetTasksAndLinks(id: number): Promise<{TaskList: Task[] , LinkList: Link[]}> {
@@ -120,10 +140,19 @@ export class ScheduleChartComponent implements OnInit {
 
   constructor() {
 
+    gantt.eachTask((t: any) => {
+      gantt.deleteTask(t.id);
+    });
+
+    
+
     switch(this.mode){
       case 'verProyecto':{
         this.nameContent = "proyectName";
-        this.saveButtonName = "Guardar Cambios"
+        this.saveButtonName = "Guardar Cambios";
+        if(this.route.snapshot.queryParams["name"]){
+          this.nameContent = this.route.snapshot.queryParams['name'];
+        }
         break;
       }
       case 'NuevoProyectoSP':{
@@ -150,24 +179,38 @@ export class ScheduleChartComponent implements OnInit {
   }
 
   public async uploadChanges(): Promise<void>{
-    const content = gantt.serialize();
-    console.log(content);
-    if(this.id !== null){
-      try {
+    
+    const name = (this.proyectNameField.nativeElement as HTMLInputElement).value;
 
-        await this.tasksService.deleteAllByPidPromise(this.id);
+    console.log(name);
 
-        await this.tasksService.SaveProyectTasksandLinks(
-          this.id,
-          content.data,
-          content.links
-        );
+    if(name && this.id){
 
-        console.log('Cambios subidos correctamente');
-      } catch (err) {
-        console.error('Error al subir cambios:', err);
+      const content = gantt.serialize();
+        try {
+
+          const element = await this.tasksService.GetProyect(this.id).then((proyect: Proyect | any) =>{
+              
+              return {id: proyect[0].id, start: proyect[0].start, end: proyect[0].end, title: name, color: proyect[0].color} as Proyect;
+            })
+
+          await this.tasksService.deleteProyectByPidPromise(element.id);
+
+          await this.tasksService.createProyect(element);
+
+          await this.tasksService.deleteAllByPidPromise(this.id);
+
+          await this.tasksService.SaveProyectTasksandLinks(
+            this.id,
+            content.data,
+            content.links
+          );
+
+          console.log('Cambios subidos correctamente');
+        } catch (err) {
+          console.error('Error al subir cambios:', err);
+        }
       }
-    }
   }
 
   public returnToCalendar(): void{

@@ -1,7 +1,7 @@
-import { Component, ElementRef, inject, LOCALE_ID, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, inject, LOCALE_ID, OnInit, ViewChild } from '@angular/core';
 import { CalendarDateFormatter, CalendarEvent, CalendarModule, CalendarMonthViewDay, DateAdapter } from 'angular-calendar';
 import { SchedulerDateFormatter, SchedulerModule } from 'angular-calendar-scheduler';
-import { startOfDay, addHours, addMonths, subMonths, isSameMonth, isSameDay, sub } from 'date-fns';
+import { startOfDay, addHours, addMonths, subMonths, isSameMonth, isSameDay, sub, getHours } from 'date-fns';
 import { Router } from '@angular/router';
 import { CommonModule, registerLocaleData } from '@angular/common';
 import localeEs from '@angular/common/locales/es';
@@ -9,6 +9,8 @@ import { DOCUMENT } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
 import { FormGroup, FormControl } from '@angular/forms';
 import { dbDAO } from '../dbDAO';
+import { Title } from '@angular/platform-browser';
+import { Proyect } from '../proyect';
 
 @Component({
   selector: 'app-schedule-calendar',
@@ -187,7 +189,7 @@ import { dbDAO } from '../dbDAO';
     }
   ]
 })
-export class ScheduleCalendarComponent{
+export class ScheduleCalendarComponent implements AfterViewInit{
 
   public viewDate: Date = new Date();
   public activeDayIsOpen: boolean = false;
@@ -213,12 +215,19 @@ export class ScheduleCalendarComponent{
 
   constructor(){
     registerLocaleData(localeEs);
-    this.downloadEvents();
+    
+  }
+
+  ngAfterViewInit(): void {
+      this.downloadEvents();
   }
 
   async downloadEvents(){
     let dbproyects = await this.proyects.GetProyects();
     this.events = dbproyects ?? [];
+    //let cal = this.events[0]
+    //let proyect: Proyect = {id: (cal.id as number)+1, start: cal.start, end: getHours(cal.end!.getTime() - cal.start!.getTime())+32 ,title: cal.title, color: {primary: cal.color!.primary as string, secondary: cal.color!.secondary as string} }
+    //await this.proyects.createProyect(proyect);
   }
 
   previousMonth(): void {
@@ -244,7 +253,7 @@ export class ScheduleCalendarComponent{
 
   public goToProyectSchedule(event: CalendarEvent): void {
 
-    this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: event.id}});
+    this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: event.id, name: event.title}});
 
   }
 
@@ -401,7 +410,7 @@ export class ScheduleCalendarComponent{
   const randomInt = Math.floor(Math.random() * 0x1000000);
   const color = `#${randomInt.toString(16).padStart(6, '0')}`.toUpperCase();
 
-  const dimmed = this.lightenColor(color, 0.5);
+  const dimmed = this.lightenColor(color, 0.6);
   return { color, dimmed };
 }
 

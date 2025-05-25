@@ -34,6 +34,18 @@ export class dbDAO {
   return undefined;
 }
 
+  public async GetProyect(Pid: number): Promise<Proyect | undefined> {
+  const params = new URLSearchParams({
+    pid: Pid.toString() 
+  });
+  const res = await fetch("http://localhost:3000/proyect?pid=" + Pid);
+  if (res.status === 200) {
+    return await res.json() as Proyect;
+  }
+  // 404 → usuario no encontrado / credenciales inválidas
+  return undefined;
+}
+
   public async GetProyectTasks(id: number): Promise<Task[]>{
 
     let data = await fetch("http://localhost:3000/tasks?pid=" + id);
@@ -95,6 +107,16 @@ export class dbDAO {
 
   }
 
+  public async createProyect(proyect: Proyect): Promise<void> {
+  
+    await lastValueFrom(
+      this.http.post<number>(
+        'http://localhost:3000/proyect/create',
+        proyect
+      )
+    );
+  }
+
   public createTasksBatch(tasks: Task[]): Observable<number> {
     return this.http.post<number>(
       `http://localhost:3000/tasks/batch`,
@@ -125,6 +147,31 @@ export class dbDAO {
 
     return { tasksDeleted, linksDeleted };
   }
+
+  async deleteProyectByPidWrapper(pid: number): Promise<number>{
+
+    const proyectPromise = lastValueFrom(this.deleteProyectByPid(pid));
+
+    const [proyectDeleted] = await Promise.all([proyectPromise]);
+
+    return proyectDeleted;
+  }
+
+  deleteProyectByPid(pid: number): Observable<number> {
+    const params = new HttpParams().set('pid', pid.toString());
+    return this.http
+      .delete<{ deletedCount: number }>(
+        'http://localhost:3000/proyect/delete',
+        { params }
+      )
+      .pipe(map(res => res.deletedCount));
+  }
+
+  deleteProyectByPidPromise(pid: number): Promise<number> {
+    return lastValueFrom(this.deleteProyectByPid(pid));
+  }
+
+
 
   public deleteTasksByPid(pid: number): Observable<number> {
     const params = new HttpParams().set('pid', pid.toString());
@@ -162,7 +209,6 @@ export class dbDAO {
       })
     });
 
-    console.log(calendarEvents);
 
     return calendarEvents ?? [] ;
   }
