@@ -1,6 +1,6 @@
 export interface Proyect {
     id: number,
-    start: Date,
+    start: string,
     end: number,
     title: string,
     color: {

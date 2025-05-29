@@ -259,7 +259,12 @@
   
 }
 
-#addFestivo{
+#saveChangesButtonDiv{
+  display: flex;
+  justify-content: center;
+}
+
+#addFestivo, #saveCalendarConfig{
   margin-top: 1.3rem;
   margin-bottom: 10px;
   grid-column-start: 2;
@@ -273,12 +278,13 @@
   padding: 10px;
 }
 
-#addFestivo:hover{
+#addFestivo:hover, #saveCalendarConfig:hover{
   border-radius: 5pt;
   border: 1px solid ;
   transition: .3s;
 }
-#addFestivo:active{
+
+#addFestivo:active, #saveCalendarConfig:active{
   background-color: #024cbd;
   color: #FFFFFF;
   transition: .3s;
@@ -590,7 +596,56 @@ input[type="submit"]:active{
   padding-bottom: 1rem;
 }
 
-.templateSelect h4{
-  margin: 0;
-  margin-top: 5px;
+.templateName{
+  align-self: center;
+}
+
+.dateStartSelector{
+  padding: 25px;
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+  justify-content: center;
+}
+/*reglas de estiolo para nuevo proyecto sin plantilla*/
+
+#proyectNameInput{
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+  padding: 25px;
+  max-height: 25px;
+  align-items: center;
+}
+
+#inputName{
+  width: 20rem;
+}
+
+#newProyectSPbutton{
+  display: flex;
+  justify-content: center;
+}
+
+#iniciarProyecto{
+  outline: none;
+  border: none;
+  border: 1px solid transparent;
+  border-radius: 5pt;
+  background: inherit;
+  color: #0d6efd;
+  padding: 1rem;
+}
+
+#iniciarProyecto:hover{
+  border-radius: 5pt;
+  border: 1px solid ;
+  transition: .3s;
+  text-decoration: none;
+}
+
+#iniciarProyecto:active{
+  background-color: #024cbd;
+  color: #FFFFFF;
+  transition: .3s;
 }

@@ -1,16 +1,20 @@
-import { AfterViewInit, Component, ElementRef, inject, LOCALE_ID, OnInit, ViewChild } from '@angular/core';
-import { CalendarDateFormatter, CalendarEvent, CalendarModule, CalendarMonthViewDay, DateAdapter } from 'angular-calendar';
+import { AfterViewInit, Component, ElementRef, EventEmitter, inject, LOCALE_ID, OnInit, viewChild, ViewChild } from '@angular/core';
+import { CalendarA11y, CalendarDateFormatter, CalendarEvent, CalendarModule, CalendarMonthViewDay } from 'angular-calendar';
 import { SchedulerDateFormatter, SchedulerModule } from 'angular-calendar-scheduler';
-import { startOfDay, addHours, addMonths, subMonths, isSameMonth, isSameDay, sub, getHours } from 'date-fns';
+import { startOfDay, addHours, addMonths, subMonths, isSameMonth, isSameDay, format} from 'date-fns';
 import { Router } from '@angular/router';
-import { CommonModule, registerLocaleData } from '@angular/common';
+import { CommonModule, CurrencyPipe, registerLocaleData } from '@angular/common';
 import localeEs from '@angular/common/locales/es';
 import { DOCUMENT } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
 import { FormGroup, FormControl } from '@angular/forms';
 import { dbDAO } from '../dbDAO';
-import { Title } from '@angular/platform-browser';
+import { CalendarConfig } from '../calendar-config';
 import { Proyect } from '../proyect';
+import { ColdObservable } from 'rxjs/internal/testing/ColdObservable';
+import { Plantilla } from '../plantilla';
+
+
 
 @Component({
   selector: 'app-schedule-calendar',
@@ -23,12 +27,12 @@ import { Proyect } from '../proyect';
           <li (click)="openMenu($event)" class="item" id="menu-one">Proyectos
             <ul class="closed">
               <li (click)="selectOption('NuevoProyecto')">Nuevo Proyecto</li>
-              <li (click)="openView('NuevoProyectoSP')">Nuevo Proyecto sin Plantilla</li>
+              <li (click)="selectOption('NuevoProyectoSP')">Nuevo Proyecto sin Plantilla</li>
             </ul>
           </li>
           <li (click)="openMenu($event)" class="item" id="menu-two">Plantillas
             <ul class="closed">
-              <li (click)="openView('NuevaPlantilla')">Nueva Plantilla</li>
+              <li (click)="generarNuevaPlantilla()">Nueva Plantilla</li>
               <li (click)="selectOption('EditarPlantilla')">Editar Plantilla</li>
             </ul>
           </li>
@@ -83,6 +87,9 @@ import { Proyect } from '../proyect';
           <div *ngSwitchCase="'NuevoProyecto'">
             <ng-container *ngTemplateOutlet="newProyect"/>
           </div>
+          <div *ngSwitchCase="'NuevoProyectoSP'">
+            <ng-container *ngTemplateOutlet="newProyectNP"/>
+          </div>
         </div>
       <ng-template #calendarConfig>
         <h3>Horas de trabajo</h3>
@@ -90,28 +97,31 @@ import { Proyect } from '../proyect';
             <p>Entrada</p>
             <p></p>
             <p>Salida</p>
-            <input type="time">
+            <input type="time" [value]="calendarConfigData.entrada" #entrada>
             <p>Hasta</p>
-            <input type="time">
+            <input type="time" [value]="calendarConfigData.salida" #salida>
           </div>
           <div class="festivos">
             <h3>Dias festivos</h3>
             <div class="dates">
-              <input type="date">
+              <input type="date" #fecha1>
               <div id="container">
-                <input type="checkbox" name="puente" class="dateEnabler">
+                <input type="checkbox" id="puente" class="dateEnabler" (click)="daysSpan($event)">
                 <label for="puente">Hasta</label>
               </div>     
-              <input type="date" class="disabled">
-              <input type="button" value="agregar" id="addFestivo">
+              <input type="date" class="disabled" #fecha2 >
+              <input type="button" value="agregar" id="addFestivo" #agregarFestivo (click)="agregarFechas()">
             </div>
             <div class="listVacations">
-              <div class="vacations" *ngFor="let fechas of fechasFestivos; index as i">
-                  <input type="date">
+              <div class="vacations" *ngFor="let fechas of calendarConfigData.festivos; index as i">
+                  <input type="date" [value]="formatDateToISO(fechas.diaInicio)" class="disabled">
                   <p>-</p>
-                  <input type="date">
-                  <input type="button" value="eliminar">
+                  <input type="date" [value]="formatDateToISO(fechas.diaFin)" class="disabled">
+                  <input type="button" value="eliminar" [id]="i" (click)="eraseDate($event)">
               </div>
+            </div>
+            <div id="saveChangesButtonDiv">
+            <input type="button" value="Guardar cambios" id="saveCalendarConfig" #saveCalendarConfig (click)="saveConfig()">
             </div>
           </div>
       </ng-template>
@@ -149,14 +159,12 @@ import { Proyect } from '../proyect';
       <ng-template #editTemplate>
         <h3>Plantillas</h3>
         <div class="listTemplates">
-              <div class="templateData" *ngFor="let fechas of fechasFestivos; index as i">
-                  <input type="text">
+              <div class="templateData" *ngFor="let plantilla of plantillas; index as i">
+                  <h4 class="templateName" [id]="i">{{plantilla.title}}</h4>
                   <input type="button" value="editar" id="editar">
-                  <input type="button" value="eliminar">
+                  <input type="button" value="eliminar" (click)="eliminarPlantilla(plantilla)">
               </div>
         </div>
-        <input type="button" value="agregar" class="confirmChanges">
-
       </ng-template>
 
       <ng-template #newProyect>
@@ -167,14 +175,35 @@ import { Proyect } from '../proyect';
                   <input type="button" value="Usar Plantilla" id="editar">
               </div>
         </div>
+        <div class="dateStartSelector">
+          <input type="checkbox" #checkAuto id="autoDate">
+          <label for="autoDate">selección de fecha automática</label>
+          <input type="datetime-local">
+        </div>
+        
+      </ng-template>
+
+      <ng-template #newProyectNP>
+      <h3>Plantillas</h3>
+        <div id="proyectNameInput">
+              <h4>Nombre de Proyecto:</h4>
+              <input type="text" #textInputProyectName id="inputName" #NPSPName>
+        </div>
+        <div class="dateStartSelector">
+          <input type="checkbox" id="autoDate" (click)="autoClicked($event)">
+          <label for="autoDate">selección de fecha automática</label>
+          <input type="datetime-local" #NPSPDateStart>
+        </div>
+        <div id="newProyectSPbutton">
+          <input type="button" id="iniciarProyecto" value="Iniciar Proyecto" (click)="iniciarProyecto()">
+        </div>
       </ng-template>
 
       <ng-template #eventActionsTpl let-event="event" >
-        <button class="removeProyect" mwlCalendarAction="delete">
+        <button class="removeProyect" mwlCalendarAction="delete" (click)="eraseProyect(event)">
           X
         </button>
       </ng-template>
-
     
   `,
   styleUrl: './schedule-calendar.component.css',
@@ -189,7 +218,7 @@ import { Proyect } from '../proyect';
     }
   ]
 })
-export class ScheduleCalendarComponent implements AfterViewInit{
+export class ScheduleCalendarComponent implements OnInit{
 
   public viewDate: Date = new Date();
   public activeDayIsOpen: boolean = false;
@@ -198,6 +227,8 @@ export class ScheduleCalendarComponent implements AfterViewInit{
   private lock: boolean = false;
   public configOption: string = "";
   private proyects: dbDAO = inject(dbDAO);
+  public calendarConfigData!: CalendarConfig;
+  public plantillas!: Plantilla[];
 
   public fechasFestivos: {inicio: Date, fin:Date}[] = [ {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}];
   
@@ -206,6 +237,14 @@ export class ScheduleCalendarComponent implements AfterViewInit{
   @ViewChild("buttons") private buttons!: ElementRef;
   @ViewChild("calendar") private calendar!: ElementRef;
   @ViewChild("closeButton") private closeButton!: ElementRef;
+  @ViewChild('fecha2') private fechaFin!:ElementRef;
+  @ViewChild('fecha1') private fechaInicio!:ElementRef;
+  @ViewChild('entrada') private entrada!:ElementRef;
+  @ViewChild('salida') private salida!:ElementRef;
+  @ViewChild('NPSPName') private entradaNPSP!:ElementRef;
+  @ViewChild('NPSPDateStart') private dateStartNPSP!:ElementRef;
+
+
 
   public crearUsuario: FormGroup =  new FormGroup({
     //nombre: new FormControl(''),
@@ -218,8 +257,15 @@ export class ScheduleCalendarComponent implements AfterViewInit{
     
   }
 
-  ngAfterViewInit(): void {
+  async ngOnInit(): Promise<void> {
+      this.plantillas = await this.proyects.GetTemplates().then((plantillas: Plantilla[]) =>{
+        return plantillas;
+      });
+
       this.downloadEvents();
+      this.calendarConfigData = await this.proyects.GetCalendarConfig().then((config: CalendarConfig) => {
+        return config;
+      });
   }
 
   async downloadEvents(){
@@ -312,7 +358,7 @@ export class ScheduleCalendarComponent implements AfterViewInit{
     const config = this.config.nativeElement as HTMLElement;
     const closeButton = this.closeButton.nativeElement as HTMLElement;
 
-    if(this.configOption !== 'NuevoProyectoSP' && this.configOption !== 'NuevaPlantilla'){
+    if(this.configOption !== 'NuevaPlantilla'){
       nav.classList.add('disabled');
       calendar.classList.add('disabled');
       buttons.classList.add('disabled');
@@ -401,9 +447,6 @@ export class ScheduleCalendarComponent implements AfterViewInit{
   }
 
 
-  openView(view: string): void{
-    this.router.navigate(['/proyectSchdedule'], {queryParams:{title: view}});
-  }
 
   getRandomHexColor(): { color: string; dimmed: string } {
 
@@ -432,5 +475,187 @@ lightenColor(hex: string, percent: number): string {
     .toString(16)
     .slice(1)
     .toUpperCase()}`;
-}
+  }
+
+  public formatDateToISO(usDate: string | undefined): string | undefined {
+    if(usDate !== undefined){
+      const [month, day, year] = usDate.split('-');
+    // Nos aseguramos de tener dos dígitos en mes y día
+      if(month.length === 4){
+        return usDate
+      }else{
+        const mm = month.padStart(2, '0');
+        const dd = day.padStart(2, '0');
+        return `${year}-${mm}-${dd}`;
+      }
+      
+    }else{
+      return undefined;
+    }  
+  }
+
+  public daysSpan(event: Event){
+      const checkbox = event.target as HTMLInputElement;
+      const activated = this.fechaFin.nativeElement as HTMLInputElement;
+      if(checkbox.checked){
+        activated.className = "";
+      }else{
+        activated.className = "disabled"
+        activated.value = "";
+      }
+
+  }
+
+  public async saveConfig(){
+    const entrada = (this.entrada.nativeElement as HTMLInputElement).value;
+    const salida = (this.salida.nativeElement as HTMLInputElement).value;
+
+    if(entrada !== "" && salida !== ""){
+      this.calendarConfigData.entrada = entrada;
+      this.calendarConfigData.salida = salida;
+    }
+    
+
+    await this.proyects.updateCalendarConfigPromise(this.calendarConfigData);
+  }
+
+  public agregarFechas(){
+    const fechaInicio = this.fechaInicio.nativeElement as HTMLInputElement;
+    const fechaFin = this.fechaFin.nativeElement as HTMLInputElement;
+    
+    let insert:{diaInicio: string, diaFin: string | undefined};
+
+    if(fechaInicio.value !== ""){
+      let StartDateToInsert = fechaInicio.value;
+      if(fechaFin.value === ""){
+        insert = {diaInicio: StartDateToInsert, diaFin: undefined};
+      }else{
+        insert = {diaInicio: StartDateToInsert, diaFin: fechaFin.value};
+      }
+      
+      if(this.calendarConfigData.festivos.indexOf(insert) < 0){
+        this.calendarConfigData.festivos.push(insert);
+      }
+    }
+  }
+
+  public eraseDate(event: Event){
+    const listIndex = parseInt((event.target as HTMLElement).id);
+    this.calendarConfigData.festivos.splice(listIndex, 1);
+  }
+
+  public autoClicked(event: Event){
+    const clicked = (event.target as HTMLInputElement).checked;
+    const fecha = (this.dateStartNPSP.nativeElement as HTMLInputElement);
+
+    const currentDate = new Date();
+
+
+    let events = [...this.events];
+    if(clicked){
+        events.forEach((e: CalendarEvent) => {
+        if((e.end ?? "") < currentDate){
+          events.splice(events.indexOf(e),1);
+        }
+      });
+
+      if(events.length === 0){
+
+        let splittedDate = addHours(currentDate,2).toISOString().split(":");
+        fecha.value = splittedDate[0]+":"+splittedDate[1];
+      }else{
+        let currentHighestEndDate = events[0].end;
+        events.forEach((e: CalendarEvent) =>{
+          if((currentHighestEndDate ?? "") < (e.end ?? "")){
+            currentHighestEndDate = e.end;
+          }
+        });
+        let splittedDate = addHours((currentHighestEndDate ?? new Date), 2).toISOString().split(":");
+        fecha.value = splittedDate[0]+":"+splittedDate[1];
+      }
+    }else{
+      fecha.value = "";
+    }
+  }
+
+  public async iniciarProyecto(){
+    const fecha = (this.dateStartNPSP.nativeElement as HTMLInputElement);
+    const nombre = (this.entradaNPSP.nativeElement as HTMLInputElement);
+    
+
+    if(fecha.value !== "" && nombre.value !== ""){
+      const newColor = this.getRandomHexColor();
+      const calendarEvent: CalendarEvent = {
+        id: Math.floor(Math.random() * 100000000),
+        start: new Date(fecha.value),
+        title: nombre.value,
+        end: addHours(new Date(fecha.value),1),
+        color: {
+          primary: newColor.color,
+          secondary: newColor.dimmed
+        }
+      }
+      const ProyectToSave: Proyect = {
+        id: calendarEvent.id as number,
+        start: format(calendarEvent.start, 'MM-dd-yyyy HH:mm'),
+        end: (Math.ceil((calendarEvent.end?.getTime() ?? 0 - calendarEvent.start.getTime())/3600000)),
+        title: calendarEvent.title,
+        color: {
+          primary: calendarEvent.color!.primary,
+          secondary: calendarEvent.color!.secondary
+        }
+      }
+      
+      await this.proyects.createProyect(ProyectToSave);
+      this.events = [...this.events, calendarEvent];
+      console.log(this.events);
+      //this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: event.id, name: event.title}});
+    }
+
+  }
+
+  async eraseProyect(event: CalendarEvent){
+
+    const indexOfEvent = this.events.indexOf(event);
+    this.events.splice(indexOfEvent, 1);
+
+    await this.proyects.deleteAllByPidPromise(event.id as number);
+    await this.proyects.deleteProyectByPidPromise(event.id as number);
+
+    this.events = [...this.events];
+    
+    
+  }
+
+
+  public async eliminarPlantilla(element: Plantilla){
+
+    const index = this.plantillas.indexOf(element);
+    this.plantillas.splice(index,1);
+
+    this.plantillas = [...this.plantillas];
+
+    await this.proyects.deleteTemplateAllByPidPromise(element.id);
+    await this.proyects.deleteTemplateByTidPromise(element.id);
+
+  }
+
+  public async generarNuevaPlantilla(){
+    let plantilla: Plantilla;
+
+    const index = Math.ceil(Math.random() * 10000000);
+
+    plantilla = {title: "Nueva Plantilla", end: 0, id: index};
+
+    await this.proyects.createTemplate(plantilla);
+
+    this.router.navigate(['/proyectSchdedule'], {queryParams:{id: plantilla.id ,title: "EditarPlantilla"}});
+
+  }
+
+  openEditView(view: string): void{
+    this.router.navigate(['/proyectSchdedule'], {queryParams:{title: view}});
+  }
+
+
 }

@@ -1,4 +1,4 @@
-import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject, LOCALE_ID, ɵChangeDetectionSchedulerImpl, AfterViewInit } from '@angular/core';
+import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject, LOCALE_ID, ɵChangeDetectionSchedulerImpl, AfterViewInit, OnDestroy } from '@angular/core';
 import { gantt, } from 'dhtmlx-gantt';
 import { dbDAO } from '../dbDAO';
 import { DataBaseRawData } from '../data-base-raw-data';
@@ -6,9 +6,10 @@ import { ActivatedRoute, Router} from '@angular/router';
 import { CPMTask } from '../cpmtask';
 import { Task } from '../task';
 import { Link } from '../link';
-import { Title } from '@angular/platform-browser';
-import { query } from 'express';
 import { Proyect } from '../proyect';
+import {format} from 'date-fns'
+import { Plantilla } from '../plantilla';
+
 
 
 @Component({
@@ -28,19 +29,20 @@ import { Proyect } from '../proyect';
     `,
   styleUrls: ['./schedule-chart.component.css']
 })
-export class ScheduleChartComponent implements OnInit, AfterViewInit {
-
-
+export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy {
 
 
   tasksService: dbDAO = inject(dbDAO);
   tasksList: DataBaseRawData[] = [];
   private route = inject(ActivatedRoute);
   private router = inject(Router);
-  private id = null;  
+  private id = this.route.snapshot.queryParams['id'];  
   private mode: string = this.route.snapshot.queryParams['title'];
+  private timerID: number = 0;
+
   public nameContent: string = "";
   public saveButtonName: string = "";
+
 
   @ViewChild('proyectName') proyectNameField!: ElementRef;
 
@@ -49,38 +51,74 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit {
   async ngAfterViewInit(): Promise<void> {
 
       if(this.id !== null){
-        const element = await this.tasksService.GetProyect(this.id).then((proyect: Proyect | any) =>{
+        if(this.mode === "verProyecto"){
+          const element = await this.tasksService.GetProyect(this.id).then((proyect: Proyect | any) =>{
               
             return {id: proyect[0].id, start: proyect[0].start, end: proyect[0].end, title: proyect[0].title, color: proyect[0].color} as Proyect;
           });
-        this.nameContent = element.title;
+          this.nameContent = element.title;
+        }
+        else if(this.mode === 'EditarPlantilla'){
+          const element = await this.tasksService.GetTemplate(this.id).then((plantilla:  Plantilla | any)=>{
+            return {id: plantilla[0].id, title: plantilla[0].title, end: plantilla[0].end}
+          });
+          this.nameContent = element.title;
+        }
       }
+
+      this.timerID = window.setInterval(()=>{
+        this.calculateCriticalPath();
+      }, 350);
 
   }
 
-  ngOnInit(): void {
+  ngOnDestroy(): void {
+      window.clearInterval(this.timerID);
+  }
+
+  async ngOnInit(): Promise<void>{
+    
+    if(this.mode === "verProyecto"){
+      this.initateGanttForViewProyect();
+    }else if(this.mode === "EditarPlantilla"){
+      this.initiateGanttForEditTemplate();
+    }
     
 
+  }
+  
+  private async initiateGanttForEditTemplate(){
+    
+    
+  }
 
+  private async initateGanttForViewProyect(){
     this.id = this.route.snapshot.queryParams['id'] ?? null;
+    
+    let element!: any;
+
+    if(this.id){
+      
+      element = await this.tasksService.GetProyect(this.id).then((proyect: Proyect | any) =>{
+        
+        return {id: proyect[0].id, start: proyect[0].start, end: proyect[0].end, title: proyect[0].title, color: proyect[0].color} as Proyect;
+      });
+
+    }
+    
 
     gantt.i18n.setLocale('es');
     
     gantt.config.date_format = '%Y-%m-%d %H:%i';
 
-    gantt.config.start_date = new Date(2025, 0, 1);
-    gantt.config.end_date = gantt.date.add(gantt.config.start_date, 15, 'day');
+    gantt.config.start_date = new Date(format(element.start, 'MM-dd-yyyy HH:mm'));
+    gantt.config.end_date = gantt.date.add(gantt.config.start_date, 31, 'day');
 
     gantt.config.scales = [
       { unit: 'day',  step: 1, format: '%d %M' },
       { unit: 'hour', step: 1, format: '%H:%i' },
       
     ];
-
-    gantt.config['subscales'] = [
-      { unit: 'minute', step: 15, format: '%H:%i'}
-    ]
-
 
     gantt.config.scale_height = 50;
     gantt.config.min_column_width = 45;
@@ -122,9 +160,8 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit {
         this.calculateCriticalPath();
       });
     }
-
   }
-  
+
   private async GetTasksAndLinks(id: number): Promise<{TaskList: Task[] , LinkList: Link[]}> {
     
     let Tasks: Task[] = [];
@@ -138,6 +175,8 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit {
 
   }
 
+
+
   constructor() {
 
     gantt.eachTask((t: any) => {
@@ -150,9 +189,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit {
       case 'verProyecto':{
         this.nameContent = "proyectName";
         this.saveButtonName = "Guardar Cambios";
-        if(this.route.snapshot.queryParams["name"]){
-          this.nameContent = this.route.snapshot.queryParams['name'];
-        }
+        
         break;
       }
       case 'NuevoProyectoSP':{
@@ -166,7 +203,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit {
         break;
       }
       case 'EditarPlantilla':{
-        
+        this.saveButtonName = "Guardar Plantilla"
         break;
       }
       default:{
@@ -182,16 +219,15 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit {
     
     const name = (this.proyectNameField.nativeElement as HTMLInputElement).value;
 
-    console.log(name);
-
     if(name && this.id){
 
       const content = gantt.serialize();
         try {
 
           const element = await this.tasksService.GetProyect(this.id).then((proyect: Proyect | any) =>{
-              
-              return {id: proyect[0].id, start: proyect[0].start, end: proyect[0].end, title: name, color: proyect[0].color} as Proyect;
+              const {startDate, hours} = this.proyectSpan();
+              //format(startDate.toString(), 'MM-dd-yyyy HH:mm');
+              return {id: proyect[0].id, start: format(startDate.toString(), 'MM-dd-yyyy HH:mm'), end: hours, title: name, color: proyect[0].color} as Proyect;
             })
 
           await this.tasksService.deleteProyectByPidPromise(element.id);
@@ -206,7 +242,6 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit {
             content.links
           );
 
-          console.log('Cambios subidos correctamente');
         } catch (err) {
           console.error('Error al subir cambios:', err);
         }
@@ -215,32 +250,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit {
 
   public returnToCalendar(): void{
     this.router.navigate(['/Calendar']);
-  }
-
-  private processRawDataMontaje(){
-
-    let size: number = this.tasksList.length;
-    for(let i = 0 ; i < size - 1; i++){
-      if(this.tasksList[i].ID.includes(this.tasksList[i+1].ID)){
-        this.tasksList.splice(i+1,1);
-        --size;
-      }
-    }
-
-    console.log(this.tasksList);
-
-    const filteredDataLvlmax: DataBaseRawData[] = this.tasksList.filter(
-      element => (element.Nv === 1 || element.Nv === 2) && element.Tipo == "T"
-    );
-    let filteredDataLvlmaxCopy = [...filteredDataLvlmax].reverse();
-    let lastLevel: number = filteredDataLvlmax[filteredDataLvlmax.length-1].Nv;
-
-
-    let StartingLevel: boolean = true;
-    filteredDataLvlmax.forEach(element => {
-      
-    });
-
+  
   }
 
  public calculateCriticalPath(): void {
@@ -303,6 +313,32 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit {
     gantt
   });
 
+  }
+
+  private proyectSpan():{startDate: Date, hours: number}{
+    
+    let earliestStart: Date = new Date(0); 
+    let latestEnd: Date = new Date(0);
+    let started: boolean = false;
+   
+    gantt.eachTask((t)=>{
+      if(!started){
+        earliestStart = t.start_date;
+        latestEnd = t.end_date;
+        started = true;
+      }else{
+        if(earliestStart > t.start_date){
+          earliestStart = t.start_date
+        }
+        if(latestEnd < t.end_date){
+          latestEnd = t.end_date;
+        }
+      }
+    });
+
+    //console.log(Math.ceil((latestEnd.getTime() - earliestStart.getTime())/3600000));
+
+    return { startDate: earliestStart, hours: Math.ceil((latestEnd.getTime() - earliestStart.getTime())/3600000) };
   }
 
 }

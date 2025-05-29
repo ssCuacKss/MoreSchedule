@@ -9,6 +9,9 @@ import { Link } from './link';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, forkJoin, lastValueFrom} from 'rxjs';
 import {map} from 'rxjs/operators'
+import { AnyCatcher } from 'rxjs/internal/AnyCatcher';
+import { CalendarConfig } from './calendar-config' ;
+import { Plantilla } from './plantilla';
 
 @Injectable({
   providedIn: 'root'
@@ -22,29 +25,56 @@ export class dbDAO {
   constructor() { }
 
   public async GetUser(uname: string, pass: string): Promise<User | undefined> {
-  const params = new URLSearchParams({
-    uname: uname.trim().toLowerCase(),
-    pass: pass.trim()
-  });
-  const res = await fetch(`http://localhost:3000/users/auth?${params}`);
-  if (res.status === 200) {
-    return await res.json() as User;
+    const params = new URLSearchParams({
+      uname: uname.trim().toLowerCase(),
+      pass: pass.trim()
+    });
+    const res = await fetch(`http://localhost:3000/users/auth?${params}`);
+    if (res.status === 200) {
+      return await res.json() as User;
+    }
+    // 404 → usuario no encontrado / credenciales inválidas
+    return undefined;
   }
-  // 404 → usuario no encontrado / credenciales inválidas
-  return undefined;
-}
+
+  public async GetCalendarConfig():Promise<CalendarConfig>{
+    const data = (await fetch("http://localhost:3000/calendar/config")).json();
+    return data;
+  }
 
   public async GetProyect(Pid: number): Promise<Proyect | undefined> {
-  const params = new URLSearchParams({
-    pid: Pid.toString() 
-  });
-  const res = await fetch("http://localhost:3000/proyect?pid=" + Pid);
-  if (res.status === 200) {
-    return await res.json() as Proyect;
+    const params = new URLSearchParams({
+      pid: Pid.toString() 
+    });
+    const res = await fetch("http://localhost:3000/proyect?pid=" + Pid);
+    if (res.status === 200) {
+      return await res.json() as Proyect;
+    }
+    return undefined;
   }
-  // 404 → usuario no encontrado / credenciales inválidas
-  return undefined;
-}
+
+
+    public async GetTemplate(Tid: number): Promise<Plantilla | undefined> {
+
+    const res = await fetch("http://localhost:3000/template?tid=" + Tid);
+    if (res.status === 200) {
+      return await res.json() as Plantilla;
+    }
+    return undefined;
+  }
+
+
+  public async GetTemplates(): Promise<Plantilla[]>{
+
+    let data = await fetch("http://localhost:3000/templates");
+
+    let plantillas: Plantilla[] = (await data.json()) as Plantilla[];
+     
+    let calendarEvents: CalendarEvent[] = [];
+
+
+    return plantillas ?? [] ;
+  }
 
   public async GetProyectTasks(id: number): Promise<Task[]>{
 
@@ -98,12 +128,13 @@ export class dbDAO {
   const linksWithPid:  Link[] = cleanRels.map(l => ({ ...l, pid }));
 
   // 2) Ejecutar ambos batch en paralelo y esperar resultados
-  const { tasksRes, linksRes } = await lastValueFrom(
-    forkJoin({
-      tasksRes: this.createTasksBatch(tasksWithPid),
-      linksRes: this.createLinksBatch(linksWithPid)
-    })
-  );
+  if(tasksWithPid.length !== 0){
+    const taskRes = await lastValueFrom(this.createTasksBatch(tasksWithPid));
+  }
+  if(linksWithPid.length !== 0){
+    const LinkRes = await lastValueFrom(this.createLinksBatch(linksWithPid));
+  }
+
 
   }
 
@@ -148,13 +179,14 @@ export class dbDAO {
     return { tasksDeleted, linksDeleted };
   }
 
-  async deleteProyectByPidWrapper(pid: number): Promise<number>{
+  updateCalendarConfigPromise(config: CalendarConfig): Promise<number>{
+    return lastValueFrom(this.updateCalendarConfig(config))
+  }
 
-    const proyectPromise = lastValueFrom(this.deleteProyectByPid(pid));
-
-    const [proyectDeleted] = await Promise.all([proyectPromise]);
-
-    return proyectDeleted;
+  updateCalendarConfig(config: CalendarConfig): Observable<number>{
+    return this.http.post<number>('http://localhost:3000/calendar/config/update',
+      config
+    );
   }
 
   deleteProyectByPid(pid: number): Observable<number> {
@@ -209,8 +241,65 @@ export class dbDAO {
       })
     });
 
-
     return calendarEvents ?? [] ;
+  }
+
+  public deleteTemplateByTid(tid: number): Observable<number> {
+    const params = new HttpParams().set('tid', tid.toString());
+    return this.http
+      .delete<{ deletedCount: number }>(
+        'http://localhost:3000/template/delete',
+        { params }
+      )
+      .pipe(map(res => res.deletedCount));
+  }
+
+   public deleteTemplateByTidPromise(tid: number): Promise<number> {
+    return lastValueFrom(this.deleteTemplateByTid(tid));
+  }
+
+  
+
+  public deleteTemplateTasksByPid(tid: number): Observable<number> {
+    const params = new HttpParams().set('tid', tid.toString());
+    return this.http
+      .delete<any>(`http://localhost:3000/template/tasks`, { params })
+      .pipe(map(res => res.deletedCount));
+  }
+
+  /** Borra todos los links cuyo pid coincida */
+  public deleteTemplateLinksByPid(tid: number): Observable<number> {
+    const params = new HttpParams().set('tid', tid.toString());
+    return this.http
+      .delete<any>(`http://localhost:3000/template/links`, { params })
+      .pipe(map(res => res.deletedCount));
+  }
+
+  public async deleteTemplateAllByPidPromise(tid: number): Promise<{
+    tasksDeleted: number;
+    linksDeleted: number;
+  }> {
+    // Convertimos Observables a Promises
+    const tasksPromise = lastValueFrom(this.deleteTemplateTasksByPid(tid));
+    const linksPromise = lastValueFrom(this.deleteTemplateLinksByPid(tid));
+
+    // Ejecutamos en paralelo
+    const [tasksDeleted, linksDeleted] = await Promise.all([
+      tasksPromise,
+      linksPromise
+    ]);
+
+    return { tasksDeleted, linksDeleted };
+  }
+
+    public async createTemplate(template: Plantilla): Promise<void> {
+  
+    await lastValueFrom(
+      this.http.post<number>(
+        'http://localhost:3000/templates/create',
+        template
+      )
+    );
   }
 
 }
