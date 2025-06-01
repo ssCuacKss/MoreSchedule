@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { DataBaseRawData } from './data-base-raw-data';
 import { User } from './user';
-import { addHours, parse } from 'date-fns';
+import { addHours, parse, format } from 'date-fns';
 import { CalendarEvent } from 'angular-calendar';
 import { Proyect } from './proyect';
 import { Task } from './task';
@@ -12,6 +12,8 @@ import {map} from 'rxjs/operators'
 import { AnyCatcher } from 'rxjs/internal/AnyCatcher';
 import { CalendarConfig } from './calendar-config' ;
 import { Plantilla } from './plantilla';
+import { TareaPlantilla } from './tarea-plantilla';
+import { LinkPlantilla } from './link-plantilla';
 
 @Injectable({
   providedIn: 'root'
@@ -302,4 +304,69 @@ export class dbDAO {
     );
   }
 
+    public createTemplateTasksBatch(tasks: TareaPlantilla[]): Observable<number> {
+    return this.http.post<number>(
+      `http://localhost:3000/template/tasks/batch`,
+      tasks
+    );
+  }
+
+  public createTemplateLinksBatch(links: LinkPlantilla[]): Observable<number> {
+    return this.http.post<number>(
+      `http://localhost:3000/template/links/batch`,
+      links
+    );
+  }
+
+    public async SaveTemplateTasksandLinks(tasks: TareaPlantilla[], rels:  LinkPlantilla[]): Promise<void> {
+
+  // 2) Ejecutar ambos batch en paralelo y esperar resultados
+    if(tasks.length !== 0){
+      const taskRes = await lastValueFrom(this.createTemplateTasksBatch(tasks));
+    }
+    if(rels.length !== 0){
+      const LinkRes = await lastValueFrom(this.createTemplateLinksBatch(rels));
+    }
+
+  }
+
+    public async GetTemplateTasks(id: number): Promise<TareaPlantilla[]>{
+
+    let data = await fetch("http://localhost:3000/template/tasks?tid=" + id);
+    let tasks = await data.json();
+    let parsedTasks: TareaPlantilla [] = [];
+    tasks.forEach((task: any) => {
+      parsedTasks.push(
+        {
+          tid: task.tid,
+          id: task.id,
+          text: task.text,
+          start_date: task.start_date,
+          duration: task.duration
+        }
+      )
+    });
+
+    return parsedTasks ?? [];
+  }
+
+  public async GetTemplateLinks(id: number): Promise<LinkPlantilla[]>{
+
+    let data = await fetch("http://localhost:3000/template/links?tid=" + id);
+    let Links = await data.json();
+    let parsedLinks: LinkPlantilla[] = [];
+    Links.forEach((link: any) => {
+      parsedLinks.push(
+        {
+          tid: link.tid,
+          id: link.id,
+          source: link.source,
+          target: link.target,
+          type: link.type
+        }
+      )
+    });
+
+    return parsedLinks ?? [];
+  }
 }

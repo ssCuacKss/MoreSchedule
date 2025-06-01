@@ -2,8 +2,8 @@ export interface CalendarConfig {
 
     entrada: string,
     salida: string,
-    festivos: {        
+    festivos:[ {        
         diaInicio: string,
         diaFin: string | undefined
-    }[]
+    }]
 }

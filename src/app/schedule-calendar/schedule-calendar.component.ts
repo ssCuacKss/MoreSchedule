@@ -1,7 +1,7 @@
 import { AfterViewInit, Component, ElementRef, EventEmitter, inject, LOCALE_ID, OnInit, viewChild, ViewChild } from '@angular/core';
 import { CalendarA11y, CalendarDateFormatter, CalendarEvent, CalendarModule, CalendarMonthViewDay } from 'angular-calendar';
 import { SchedulerDateFormatter, SchedulerModule } from 'angular-calendar-scheduler';
-import { startOfDay, addHours, addMonths, subMonths, isSameMonth, isSameDay, format} from 'date-fns';
+import { startOfDay, addHours, addMonths, subMonths, isSameMonth, isSameDay, format, add, addMinutes} from 'date-fns';
 import { Router } from '@angular/router';
 import { CommonModule, CurrencyPipe, registerLocaleData } from '@angular/common';
 import localeEs from '@angular/common/locales/es';
@@ -13,6 +13,11 @@ import { CalendarConfig } from '../calendar-config';
 import { Proyect } from '../proyect';
 import { ColdObservable } from 'rxjs/internal/testing/ColdObservable';
 import { Plantilla } from '../plantilla';
+import { TareaPlantilla } from '../tarea-plantilla';
+import { LinkPlantilla } from '../link-plantilla';
+import { parseTemplateTasksToGanttTasks } from '../schedule-chart/schedule-chart.component';
+import { Task } from '../task';
+import { Link } from '../link';
 
 
 
@@ -161,7 +166,7 @@ import { Plantilla } from '../plantilla';
         <div class="listTemplates">
               <div class="templateData" *ngFor="let plantilla of plantillas; index as i">
                   <h4 class="templateName" [id]="i">{{plantilla.title}}</h4>
-                  <input type="button" value="editar" id="editar">
+                  <input type="button" value="editar" id="editar" (click)="editarPlantilla(plantilla)">
                   <input type="button" value="eliminar" (click)="eliminarPlantilla(plantilla)">
               </div>
         </div>
@@ -170,15 +175,15 @@ import { Plantilla } from '../plantilla';
       <ng-template #newProyect>
       <h3>Plantillas</h3>
         <div class="listSelect">
-              <div class="templateSelect" *ngFor="let fechas of fechasFestivos; index as i">
-                  <h4>Texto De Ejemplo</h4>
-                  <input type="button" value="Usar Plantilla" id="editar">
+              <div class="templateSelect" *ngFor="let plantilla of plantillas; index as i">
+                  <h4>{{plantilla.title}}</h4>
+                  <input type="button" value="Usar Plantilla" id="editar" (click)="parsearPlantilla(plantilla)">
               </div>
         </div>
         <div class="dateStartSelector">
-          <input type="checkbox" #checkAuto id="autoDate">
+          <input type="checkbox" #checkAuto id="autoDate" (click)="autoClicked($event, 'NP_CP')">
           <label for="autoDate">selección de fecha automática</label>
-          <input type="datetime-local">
+          <input type="datetime-local" #NPDateStart>
         </div>
         
       </ng-template>
@@ -190,7 +195,7 @@ import { Plantilla } from '../plantilla';
               <input type="text" #textInputProyectName id="inputName" #NPSPName>
         </div>
         <div class="dateStartSelector">
-          <input type="checkbox" id="autoDate" (click)="autoClicked($event)">
+          <input type="checkbox" id="autoDate" (click)="autoClicked($event, 'NP_SP')">
           <label for="autoDate">selección de fecha automática</label>
           <input type="datetime-local" #NPSPDateStart>
         </div>
@@ -237,12 +242,13 @@ export class ScheduleCalendarComponent implements OnInit{
   @ViewChild("buttons") private buttons!: ElementRef;
   @ViewChild("calendar") private calendar!: ElementRef;
   @ViewChild("closeButton") private closeButton!: ElementRef;
-  @ViewChild('fecha2') private fechaFin!:ElementRef;
-  @ViewChild('fecha1') private fechaInicio!:ElementRef;
-  @ViewChild('entrada') private entrada!:ElementRef;
-  @ViewChild('salida') private salida!:ElementRef;
-  @ViewChild('NPSPName') private entradaNPSP!:ElementRef;
-  @ViewChild('NPSPDateStart') private dateStartNPSP!:ElementRef;
+  @ViewChild('fecha2') private fechaFin!: ElementRef;
+  @ViewChild('fecha1') private fechaInicio!: ElementRef;
+  @ViewChild('entrada') private entrada!: ElementRef;
+  @ViewChild('salida') private salida!: ElementRef;
+  @ViewChild('NPSPName') private entradaNPSP!: ElementRef;
+  @ViewChild('NPSPDateStart') private dateStartNPSP!: ElementRef;
+  @ViewChild('NPDateStart') private dateStartNPCP!: ElementRef
 
 
 
@@ -544,9 +550,11 @@ lightenColor(hex: string, percent: number): string {
     this.calendarConfigData.festivos.splice(listIndex, 1);
   }
 
-  public autoClicked(event: Event){
+  public autoClicked(event: Event, mode: string){
+
     const clicked = (event.target as HTMLInputElement).checked;
-    const fecha = (this.dateStartNPSP.nativeElement as HTMLInputElement);
+
+    const fecha = mode === 'NP_SP' ? (this.dateStartNPSP.nativeElement as HTMLInputElement) : (this.dateStartNPCP.nativeElement as HTMLInputElement)
 
     const currentDate = new Date();
 
@@ -608,8 +616,8 @@ lightenColor(hex: string, percent: number): string {
       
       await this.proyects.createProyect(ProyectToSave);
       this.events = [...this.events, calendarEvent];
-      console.log(this.events);
-      //this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: event.id, name: event.title}});
+      //console.log(this.events);
+      this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: ProyectToSave.id, name: ProyectToSave.title}});
     }
 
   }
@@ -653,9 +661,89 @@ lightenColor(hex: string, percent: number): string {
 
   }
 
-  openEditView(view: string): void{
-    this.router.navigate(['/proyectSchdedule'], {queryParams:{title: view}});
+  public editarPlantilla(plantilla: Plantilla){
+    this.router.navigate(['/proyectSchdedule'], {queryParams:{id: plantilla.id ,title: "EditarPlantilla"}});
   }
 
+  public async parsearPlantilla(plantilla: Plantilla){
+    const date = (this.dateStartNPCP.nativeElement as HTMLInputElement).value;
+    if(date !== ""){
+      const tareasPlantilla: TareaPlantilla []= await this.proyects.GetTemplateTasks(plantilla.id).then((tareas: TareaPlantilla[]) => {
+        return tareas;
+      });
+
+      const parsedTasks: Task[] = parseTemplateTasksToGanttTasks(tareasPlantilla, new Date(date));
+
+      const linksPlantilla: LinkPlantilla[] = await this.proyects.GetTemplateLinks(plantilla.id).then((links: LinkPlantilla[])=>{
+        return links;
+      });
+      
+      const parsedLinks = linksPlantilla.map((link: LinkPlantilla)=>{
+        return {id: link.id, source: link.source, target: link.target, type: link.type} as Link;
+      });
+
+      let span = this.proyectSpan(parsedTasks);
+
+      const newColor = this.getRandomHexColor();
+      const calendarEvent: CalendarEvent = {
+        id: Math.floor(Math.random() * 100000000),
+        start: new Date(date),
+        title: "Nuevo Proyecto",
+        end: addHours(date,span.hours),
+        color: {
+          primary: newColor.color,
+          secondary: newColor.dimmed
+        }
+      }
+      const ProyectToSave: Proyect = {
+        id: calendarEvent.id as number,
+        start: format(calendarEvent.start, 'MM-dd-yyyy HH:mm'),
+        end: span.hours,
+        title: calendarEvent.title,
+        color: {
+          primary: calendarEvent.color!.primary,
+          secondary: calendarEvent.color!.secondary
+        }
+      }
+      
+      await this.proyects.createProyect(ProyectToSave);
+
+      await this.proyects.SaveProyectTasksandLinks(ProyectToSave.id,parsedTasks,parsedLinks);
+
+      this.events.push(calendarEvent);
+
+      this.events = [...this.events];
+
+      this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: ProyectToSave.id, name: ProyectToSave.title}});
+
+    }
+  
+  }
+
+  proyectSpan(tareas: Task[]):{startDate: Date, hours: number}{
+    
+    let earliestStart: Date = new Date(0); 
+    let latestEnd: Date = new Date(0);
+    let started: boolean = false;
+   
+    tareas.forEach((t)=>{
+      if(!started){
+        earliestStart = new Date(t.start_date);
+        latestEnd = addMinutes(new Date(t.start_date), t.duration);
+        started = true;
+      }else{
+        if(earliestStart > new Date(t.start_date)){
+          earliestStart = new Date(t.start_date)
+        }
+        if(latestEnd < addMinutes(new Date(t.start_date), t.duration)){
+          latestEnd = addMinutes(new Date(t.start_date), t.duration);
+        }
+      }
+    });
+
+    //console.log(Math.ceil((latestEnd.getTime() - earliestStart.getTime())/3600000));
+
+    return { startDate: earliestStart, hours: Math.ceil((latestEnd.getTime() - earliestStart.getTime())/3600000) };
+  }
 
 }

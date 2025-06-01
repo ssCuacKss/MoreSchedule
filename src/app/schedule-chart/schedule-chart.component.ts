@@ -1,5 +1,5 @@
 import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject, LOCALE_ID, ɵChangeDetectionSchedulerImpl, AfterViewInit, OnDestroy } from '@angular/core';
-import { gantt, } from 'dhtmlx-gantt';
+import { gantt } from 'dhtmlx-gantt';
 import { dbDAO } from '../dbDAO';
 import { DataBaseRawData } from '../data-base-raw-data';
 import { ActivatedRoute, Router} from '@angular/router';
@@ -7,10 +7,24 @@ import { CPMTask } from '../cpmtask';
 import { Task } from '../task';
 import { Link } from '../link';
 import { Proyect } from '../proyect';
-import {format} from 'date-fns'
+import {addHours, format, hoursToMilliseconds} from 'date-fns'
 import { Plantilla } from '../plantilla';
+import { TareaPlantilla } from '../tarea-plantilla';
+import { LinkPlantilla } from '../link-plantilla';
+import { CalendarConfig } from '../calendar-config';
 
+export function parseTemplateTasksToGanttTasks(task: TareaPlantilla[], proyectStart: Date): Task[]{
+    let templateTasks:  Task[] = [];
+    templateTasks = task.map((task)=>{
+      return {
+        id: task.id,  
+        text: task.text, 
+        duration: task.duration, 
+        start_date: format(addHours(proyectStart, task.start_date).toString(), "yyyy-MM-dd HH:mm") } as Task;
 
+    });
+    return templateTasks;
+  }
 
 @Component({
   selector: 'app-schedule-chart',
@@ -29,6 +43,8 @@ import { Plantilla } from '../plantilla';
     `,
   styleUrls: ['./schedule-chart.component.css']
 })
+
+
 export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy {
 
 
@@ -89,30 +105,112 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
   
   private async initiateGanttForEditTemplate(){
     
+    gantt.i18n.setLocale('es');
     
+    gantt.config.work_time = true;
+
+    gantt.config.date_format = '%Y-%m-%d %H:%i';
+
+    gantt.config.start_date = new Date("2025-01-01");
+    gantt.config.end_date = gantt.date.add(gantt.config.start_date, 31, 'day');
+
+    gantt.config.scales = [
+      { unit: 'day',  step: 1, format: '%d %M' },
+      { unit: 'hour', step: 1, format: '%H:%i' },
+      
+    ];
+
+    let timeConfig = await this.tasksService.GetCalendarConfig().then((config: CalendarConfig)=>{
+      return {entrada: config.entrada, salida: config.salida, festivos: config.festivos};
+    });
+
+    gantt.config.scale_height = 50;
+    gantt.config.min_column_width = 45;
+    gantt.config.duration_unit = 'minute';
+    gantt.config.duration_step = 1;
+    gantt.config.time_step = 5;
+    gantt.config.round_dnd_dates = false;
+    gantt.config.min_duration    = 1 * 60 * 1000;
+    
+    gantt.config.columns= [
+      {name: "text", label: "Titulo", align: "center"},
+      {name: "add", label: ''}
+    ];
+
+    gantt.config.lightbox.sections = [
+      { name: 'Nombre', type: 'textarea', map_to: 'text', height: 35, focus: true },
+      {
+        name: 'Periodo',
+        type: 'duration',
+        map_to: 'auto',
+        time_format: ['%d', '%m', '%Y', '%H:%i'],
+        year_range: [gantt.config.start_date.getFullYear()-1, gantt.config.start_date.getFullYear()+2],
+        height: 72,
+        autofix_end: true,
+        
+      },
+      { name: 'Descripción', type: 'textarea', map_to: 'details', height: 50 }
+    ];
+
+    gantt.init(this.ganttContainer.nativeElement);
+
+    let links = await this.tasksService.GetTemplateLinks(this.id).then((links: LinkPlantilla[])=>{
+      return links;
+    });
+    let tasks = await this.tasksService.GetTemplateTasks(this.id).then((tasks: TareaPlantilla[])=>{
+      return tasks;
+    });
+
+    let data = parseTemplateTasksToGanttTasks(tasks,gantt.config.start_date);
+    
+    //console.log(data, links);
+
+    gantt.parse({data,links});
+
+    this.calculateCriticalPath();
+
   }
 
-  private async initateGanttForViewProyect(){
-    this.id = this.route.snapshot.queryParams['id'] ?? null;
-    
+  private cambiarFecha(fecha: string): string{
+    let splitFullDate = fecha.split(" ");
+    let splitDate = splitFullDate[0].split("-");
+    if(splitDate[0].length === 4){
+      return fecha;
+    }else{
+      return `${splitDate[2]}-${splitDate[0]}-${splitDate[1]} ${splitFullDate[1]}`
+    }
+  }
+
+  private async configWorkTime(){
+    let timeConfig = await this.tasksService.GetCalendarConfig().then((config: CalendarConfig)=>{
+      return {entrada: config.entrada, salida: config.salida, festivos: config.festivos};
+    });
+  
+    console.log(timeConfig);
+
+  }
+
+
+  private async initateGanttForViewProyect(){    
     let element!: any;
 
-    if(this.id){
-      
+
       element = await this.tasksService.GetProyect(this.id).then((proyect: Proyect | any) =>{
         
         return {id: proyect[0].id, start: proyect[0].start, end: proyect[0].end, title: proyect[0].title, color: proyect[0].color} as Proyect;
       });
 
-    }
-    
+
+    let fecha = this.cambiarFecha(element.start);
 
     gantt.i18n.setLocale('es');
     
     gantt.config.date_format = '%Y-%m-%d %H:%i';
 
-    gantt.config.start_date = new Date(format(element.start, 'MM-dd-yyyy HH:mm'));
-    gantt.config.end_date = gantt.date.add(gantt.config.start_date, 31, 'day');
+    gantt.config.start_date = new Date(fecha);
+
+
+    gantt.config.end_date   = gantt.date.add(gantt.config.start_date, 31, 'day');
 
     gantt.config.scales = [
       { unit: 'day',  step: 1, format: '%d %M' },
@@ -142,7 +240,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
         type: 'duration',
         map_to: 'auto',
         time_format: ['%d', '%m', '%Y', '%H:%i'],
-        year_range: [2020, 2030],
+        year_range: [gantt.config.start_date.getFullYear()-1, gantt.config.start_date.getFullYear()+2],
         height: 72,
         autofix_end: true
       },
@@ -151,7 +249,6 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
     gantt.init(this.ganttContainer.nativeElement);
 
-    if(this.id){
       this.GetTasksAndLinks(this.id).then(({ TaskList, LinkList }: { TaskList: Task[]; LinkList: Link[] }) => {
        
         let data = TaskList;
@@ -159,7 +256,8 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
         gantt.parse({data, links});
         this.calculateCriticalPath();
       });
-    }
+
+
   }
 
   private async GetTasksAndLinks(id: number): Promise<{TaskList: Task[] , LinkList: Link[]}> {
@@ -219,14 +317,14 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     
     const name = (this.proyectNameField.nativeElement as HTMLInputElement).value;
 
-    if(name && this.id){
+    if(this.mode === "verProyecto"){
+          if(name && this.id){
 
       const content = gantt.serialize();
         try {
 
           const element = await this.tasksService.GetProyect(this.id).then((proyect: Proyect | any) =>{
               const {startDate, hours} = this.proyectSpan();
-              //format(startDate.toString(), 'MM-dd-yyyy HH:mm');
               return {id: proyect[0].id, start: format(startDate.toString(), 'MM-dd-yyyy HH:mm'), end: hours, title: name, color: proyect[0].color} as Proyect;
             })
 
@@ -241,12 +339,79 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
             content.data,
             content.links
           );
-
+          
         } catch (err) {
           console.error('Error al subir cambios:', err);
         }
       }
+        }
+        else if(this.mode === 'EditarPlantilla'){
+          if(name && this.id){
+            const template = await this.tasksService.GetTemplate(this.id).then((plantilla: Plantilla | any) => {
+              const {startDate, hours} = this.proyectSpan();
+              return {id: plantilla[0].id, title: name, end: hours};
+            });
+            const tareas: TareaPlantilla[] = this.parseTemplateTasks(template);
+            //console.log(tareas);
+            const enlaces: LinkPlantilla[] = this.parseTemplateLinks(template);
+            //console.log(enlaces)
+
+            try{
+
+              await this.tasksService.deleteTemplateByTidPromise(template.id);
+
+              await this.tasksService.createTemplate(template);
+
+              await this.tasksService.deleteTemplateAllByPidPromise(template.id);
+
+              await this.tasksService.SaveTemplateTasksandLinks(tareas,enlaces);
+
+            }catch (error){
+              console.log("error: no se pudo guardar correctamente");
+            }
+
+          }
+        }
   }
+
+  public parseTemplateLinks(template: Plantilla): LinkPlantilla[]{
+
+    const links = gantt.getLinks();
+
+    let templateLinks = links.map(l =>{
+      return {
+        tid: template.id,
+        id: l.id,
+        source: l.source,
+        target: l.target,
+        type: l.type
+
+      } as LinkPlantilla;
+    });
+
+    return templateLinks;
+  }
+
+  public parseTemplateTasks(template: Plantilla): TareaPlantilla[]{
+
+    let templateTasks:  TareaPlantilla[] = [];
+
+    gantt.eachTask((task)=>{
+      let templateTask: TareaPlantilla;
+      templateTask= {
+        tid: template.id,
+        id: task.id,
+        text: task.text,
+        duration: task.duration,
+        start_date: ((task.start_date as Date).getTime() - gantt.config.start_date!.getTime())/3600000
+      }
+      templateTasks.push(templateTask);
+    })
+
+    return templateTasks;
+  }
+  
+
 
   public returnToCalendar(): void{
     this.router.navigate(['/Calendar']);

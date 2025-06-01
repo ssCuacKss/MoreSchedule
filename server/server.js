@@ -307,7 +307,6 @@ async function main() {
     });
 
     app.delete('/template/delete', async (req, res) => {
-        console.log(req.query.tid);
         const tid = parseInt(req.query.tid, 10);
         if (isNaN(tid)) {
             return res

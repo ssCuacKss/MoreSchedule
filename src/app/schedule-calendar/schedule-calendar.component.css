@@ -573,6 +573,10 @@ input[type="submit"]:active{
   border-bottom: 1px solid black;
 }
 
+.templateSelect h4{
+  align-self: center;
+}
+
 .templateSelect:last-child{
   border: none;
 }
