@@ -4,14 +4,14 @@ import { dbDAO } from '../dbDAO';
 import { DataBaseRawData } from '../data-base-raw-data';
 import { ActivatedRoute, Router} from '@angular/router';
 import { CPMTask } from '../cpmtask';
-import { Task } from '../task';
-import { Link } from '../link';
-import { Proyect } from '../proyect';
+import { Task } from '../DTO/task';
+import { Link } from '../DTO/link';
+import { Proyect } from '../DTO/proyect';
 import {addHours, format, hoursToMilliseconds} from 'date-fns'
-import { Plantilla } from '../plantilla';
-import { TareaPlantilla } from '../tarea-plantilla';
-import { LinkPlantilla } from '../link-plantilla';
-import { CalendarConfig } from '../calendar-config';
+import { Plantilla } from '../DTO/plantilla';
+import { TareaPlantilla } from '../DTO/tarea-plantilla';
+import { LinkPlantilla } from '../DTO/link-plantilla';
+import { CalendarConfig } from '../DTO/calendar-config';
 
 export function parseTemplateTasksToGanttTasks(task: TareaPlantilla[], proyectStart: Date): Task[]{
     let templateTasks:  Task[] = [];

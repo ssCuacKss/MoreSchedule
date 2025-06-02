@@ -6,7 +6,7 @@ import { CommonModule } from '@angular/common';
 import { CookieService } from 'ngx-cookie-service';
 import { dbDAO } from '../dbDAO';
 import { ViewChild } from '@angular/core';
-import { User } from '../user';
+import { User } from '../DTO/user';
 
 @Component({
   selector: 'app-log-in-screen',

@@ -1,19 +1,19 @@
 import { inject, Injectable } from '@angular/core';
 import { DataBaseRawData } from './data-base-raw-data';
-import { User } from './user';
+import { User } from './DTO/user';
 import { addHours, parse, format } from 'date-fns';
 import { CalendarEvent } from 'angular-calendar';
-import { Proyect } from './proyect';
-import { Task } from './task';
-import { Link } from './link';
+import { Proyect } from './DTO/proyect';
+import { Task } from './DTO/task';
+import { Link } from './DTO/link';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, forkJoin, lastValueFrom} from 'rxjs';
 import {map} from 'rxjs/operators'
 import { AnyCatcher } from 'rxjs/internal/AnyCatcher';
-import { CalendarConfig } from './calendar-config' ;
-import { Plantilla } from './plantilla';
-import { TareaPlantilla } from './tarea-plantilla';
-import { LinkPlantilla } from './link-plantilla';
+import { CalendarConfig } from './DTO/calendar-config' ;
+import { Plantilla } from './DTO/plantilla';
+import { TareaPlantilla } from './DTO/tarea-plantilla';
+import { LinkPlantilla } from './DTO/link-plantilla';
 
 @Injectable({
   providedIn: 'root'

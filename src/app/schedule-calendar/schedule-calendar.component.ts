@@ -9,15 +9,15 @@ import { DOCUMENT } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
 import { FormGroup, FormControl } from '@angular/forms';
 import { dbDAO } from '../dbDAO';
-import { CalendarConfig } from '../calendar-config';
-import { Proyect } from '../proyect';
+import { CalendarConfig } from '../DTO/calendar-config';
+import { Proyect } from '../DTO/proyect';
 import { ColdObservable } from 'rxjs/internal/testing/ColdObservable';
-import { Plantilla } from '../plantilla';
-import { TareaPlantilla } from '../tarea-plantilla';
-import { LinkPlantilla } from '../link-plantilla';
+import { Plantilla } from '../DTO/plantilla';
+import { TareaPlantilla } from '../DTO/tarea-plantilla';
+import { LinkPlantilla } from '../DTO/link-plantilla';
 import { parseTemplateTasksToGanttTasks } from '../schedule-chart/schedule-chart.component';
-import { Task } from '../task';
-import { Link } from '../link';
+import { Task } from '../DTO/task';
+import { Link } from '../DTO/link';
 
 
 
