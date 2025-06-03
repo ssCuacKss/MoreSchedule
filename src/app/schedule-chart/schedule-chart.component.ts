@@ -7,11 +7,13 @@ import { CPMTask } from '../cpmtask';
 import { Task } from '../DTO/task';
 import { Link } from '../DTO/link';
 import { Proyect } from '../DTO/proyect';
-import {addHours, format, hoursToMilliseconds} from 'date-fns'
+import {addHours, format, intlFormat} from 'date-fns';
 import { Plantilla } from '../DTO/plantilla';
 import { TareaPlantilla } from '../DTO/tarea-plantilla';
 import { LinkPlantilla } from '../DTO/link-plantilla';
 import { CalendarConfig } from '../DTO/calendar-config';
+import { Task as GanttTask} from 'dhtmlx-gantt';
+import { Link as GanttLink } from 'dhtmlx-gantt';
 
 export function parseTemplateTasksToGanttTasks(task: TareaPlantilla[], proyectStart: Date): Task[]{
     let templateTasks:  Task[] = [];
@@ -98,16 +100,13 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       this.initateGanttForViewProyect();
     }else if(this.mode === "EditarPlantilla"){
       this.initiateGanttForEditTemplate();
+    }else{
+      this.initiateEmptyGantt();
     }
-    
-
   }
   
-  private async initiateGanttForEditTemplate(){
-    
-    gantt.i18n.setLocale('es');
-    
-    gantt.config.work_time = true;
+  private async initiateEmptyGantt(){
+     gantt.i18n.setLocale('es');
 
     gantt.config.date_format = '%Y-%m-%d %H:%i';
 
@@ -120,9 +119,253 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       
     ];
 
-    let timeConfig = await this.tasksService.GetCalendarConfig().then((config: CalendarConfig)=>{
-      return {entrada: config.entrada, salida: config.salida, festivos: config.festivos};
+    gantt.config.scale_height = 50;
+    gantt.config.min_column_width = 45;
+    gantt.config.duration_unit = 'minute';
+    gantt.config.duration_step = 1;
+    gantt.config.time_step = 5;
+    gantt.config.round_dnd_dates = false;
+    gantt.config.min_duration    = 1 * 60 * 1000;
+    
+    gantt.config.columns= [
+      {name: "text", label: "Titulo", align: "center"},
+      {name: "add", label: ''}
+    ];
+
+    gantt.config.lightbox.sections = [
+      { name: 'Nombre', type: 'textarea', map_to: 'text', height: 35, focus: true },
+      {
+        name: 'Periodo',
+        type: 'duration',
+        map_to: 'auto',
+        time_format: ['%d', '%m', '%Y', '%H:%i'],
+        year_range: [gantt.config.start_date.getFullYear() - 1, gantt.config.start_date.getFullYear()+2],
+        height: 72,
+        autofix_end: true,
+        
+      },
+      { name: 'Descripción', type: 'textarea', map_to: 'details', height: 50 }
+    ];
+
+    gantt.init(this.ganttContainer.nativeElement);
+
+    let dbInfo = await this.initdb(3).then((e) => {return e});
+    let time = this.calculateMaxDuration(dbInfo);
+    console.log(dbInfo);
+
+    let data = this.parseInputTasks(dbInfo,time).reverse(); 
+    let links = this.parseTasksLinks(dbInfo,data);
+
+    console.log(data)
+
+    gantt.parse({data, links});
+    
+  }
+
+  private parseTasksLinks(info: {artName: string, directSons: string[], phases: {phaseNumber: string, duration: number}[]}[], tasks: GanttTask[]): GanttLink[]{
+    let links: GanttLink[] = [];
+    let linksBatch: {linkBatch: number[],art: string}[] = [];
+    info.forEach((element)=>{
+      let batch: number[] = []
+      element.phases.forEach(phase=>{
+        let aSacar = this.findByField(tasks, "text", `${element.artName}_${phase.phaseNumber}`);
+        if(aSacar !== undefined){
+          batch.push(aSacar.id as number); 
+        }
+      });
+      linksBatch.push({linkBatch: batch, art: element.artName});
     });
+    linksBatch.forEach(linksArray => {
+
+        for(let i = linksArray.linkBatch.length-1; i > 0 ; i--){
+          let link: GanttLink = { id: Math.ceil(Math.random() * 10000000), source: linksArray.linkBatch[i] , target: linksArray.linkBatch[i-1], type: '0' }
+          links.push(link);
+        } 
+    });
+
+    info.forEach((element)=>{
+      let target = this.findByField(tasks, "text", `${element.artName}_${element.phases[element.phases.length-1].phaseNumber}`)
+      console.log(target?.text);
+      if(target !== undefined){
+        element.directSons.forEach((son)=>{
+          let sonSource = this.findByField(info, "artName", son);
+          if(sonSource !== undefined){
+            let source = this.findByField(tasks, "text", `${son}_${sonSource.phases[0].phaseNumber}`);
+            if(source !== undefined){
+              let link: GanttLink = {id: Math.ceil(Math.random() * 10000000), source: source.id, target: target.id, type:'0'}
+              links.push(link);
+            }
+          }
+        });
+      }
+      
+    });
+
+    console.log(linksBatch);
+    console.log(links);
+    return links;
+  }
+  
+  private  findByField<T, K extends keyof T>(arr: T[], field: K, searchValue: T[K]): T | undefined {
+    return arr.find(item => item[field] === searchValue);
+  }
+
+  private parseInputTasks(info:{artName: string, directSons: string[], phases: {phaseNumber: string, duration: number}[]}[] , time: number): GanttTask[]{
+    let endDate = new Date(gantt.config.start_date!.getTime() + (time * 60 * 1000) +0.1*(time * 60 * 1000));
+    let endDateSafe = new Date(gantt.config.start_date!.getTime() + (time * 60 * 1000) +0.1*(time * 60 * 1000));
+    let tasks: GanttTask[] = [];
+    let stack: {artName: string, directSons: string[], phases: {phaseNumber: string, duration: number}[]}[] = [];
+    let list = [...info];
+    let share: number[] = [0];
+    stack.push(list[0]);
+      while(stack.length > 0){
+        let temp = stack[0];
+        stack.splice(0,1);
+        share.push(temp.directSons.length - 1);
+        temp.directSons.forEach(element => {
+            const aSacar = this.findByField(list, "artName", element);
+            if(aSacar !== undefined){
+              stack.push(aSacar);
+            }
+        });
+        temp.phases.forEach((phase)=>{
+            let timeManager = endDateSafe.getTime() - (phase.duration * 60000)
+            let task: GanttTask = {
+              id: Math.ceil(Math.random() * 10000000),
+              text: `${temp.artName}_${phase.phaseNumber}`,
+              end_date: endDateSafe,
+              start_date: new Date(timeManager)
+            }
+            tasks.push(task);
+            endDateSafe = new Date (timeManager - (15*60*1000));
+          });
+        if(share[0] === 0){
+          endDate = endDateSafe;
+          share.splice(0,1);
+        }else{
+          endDateSafe = endDate;
+          share[0]--;
+        }
+      }
+    return tasks;
+  }
+
+  private calculateMaxDuration(list: {artName: string, directSons: string[], phases: {phaseNumber: string, duration: number}[]}[]): number{
+    let time = 0;
+    list.forEach((element)=>{
+      element.phases.forEach(phase => {
+        time += phase.duration;
+      });
+    });
+    return time;
+  }
+
+  private async initdb(maxLevel: number): Promise<{artName: string, directSons: string[], phases: {phaseNumber: string, duration: number}[]}[]>{
+    let data = await fetch("http://localhost:3000/data");
+    let jsonData = await data.json().then((t: any)=> {return t});
+
+    let parsedData = jsonData as DataBaseRawData[];
+
+    for(let i = 1; i < parsedData.length; i++){
+      if(parsedData[i-1].ID === parsedData[i].ID){
+        parsedData.splice(i,1);
+      }
+    }
+
+    parsedData.splice(0,1);
+    const phases: DataBaseRawData[] = [];
+    const articles: DataBaseRawData[] = [];
+
+    for (let i = 0; i < parsedData.length; i++){
+      if(parsedData[i].Nv === maxLevel){
+        break;
+      }
+      if(parsedData[i].Tipo === "T" || parsedData[i].Tipo === "D"){
+          articles.push(parsedData[i]);
+        }else if(parsedData[i].Tipo === "F"){
+          phases.push(parsedData[i]);
+        }
+    }
+
+    let distinctArticles: string[] = [];
+
+
+    for (let i = 0; i < parsedData.length; i++){
+      if(parsedData[i].Nv === maxLevel){
+        break;
+      }
+      if(distinctArticles.indexOf(parsedData[i].Conjunto) < 0){
+        distinctArticles.push(parsedData[i].Conjunto);
+      }
+    }
+
+    let articleSuccesors: {artName: string, directSons: string[], phases: {phaseNumber: string, duration: number}[]}[] = [];
+    let i = true;
+    distinctArticles.forEach((element) =>{
+      if(!i){
+        articleSuccesors.push({artName: parsedData[0].Documento, phases: [] , directSons: []});
+        i = true;
+      }
+      else{
+        articleSuccesors.push({artName: element, directSons: [], phases: []});
+      }
+    });     
+    
+    articleSuccesors.forEach((father) =>{
+      articles.forEach((article) =>{
+        let arbol = article.Arbol.split(",");
+
+        if(arbol[arbol.length-2].toString().trim() === father.artName.toString().trim()){
+          father.directSons.push(arbol[arbol.length-1]);
+        }
+      });
+    });
+
+    articleSuccesors.forEach((father) =>{
+      phases.forEach((phase) =>{
+        let arbol = phase.Arbol.split(",");
+
+        if(arbol[arbol.length-2].toString().trim() === father.artName.toString().trim()){
+          father.phases.push({ phaseNumber: arbol[arbol.length-1], duration: phase.TiempoPedidas === 0 ? 10 :  phase.TiempoPedidas / 60 });
+        }
+      });
+    });
+
+    articleSuccesors.forEach((element) =>{
+      if(element.phases.length === 0){
+        element.phases.push({phaseNumber: '000', duration: 10})
+      }else{
+        element.phases.sort((a,b)=>{
+          if(a.phaseNumber > b.phaseNumber){
+            return -1;
+          }
+          if(a.phaseNumber < b.phaseNumber){
+            return 1;
+          }
+          return 0;
+        });
+      }
+      
+    });
+
+    return articleSuccesors;
+
+  }
+
+  private async initiateGanttForEditTemplate(){
+    
+    gantt.i18n.setLocale('es');
+
+    gantt.config.date_format = '%Y-%m-%d %H:%i';
+
+    gantt.config.start_date = new Date("2025-01-01");
+    gantt.config.end_date = gantt.date.add(gantt.config.start_date, 31, 'day');
+
+    gantt.config.scales = [
+      { unit: 'day',  step: 1, format: '%d %M' },
+      { unit: 'hour', step: 1, format: '%H:%i' },
+      
+    ];
 
     gantt.config.scale_height = 50;
     gantt.config.min_column_width = 45;
@@ -505,5 +748,4 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
     return { startDate: earliestStart, hours: Math.ceil((latestEnd.getTime() - earliestStart.getTime())/3600000) };
   }
-
 }

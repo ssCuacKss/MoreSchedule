@@ -11,7 +11,6 @@ import { FormGroup, FormControl } from '@angular/forms';
 import { dbDAO } from '../dbDAO';
 import { CalendarConfig } from '../DTO/calendar-config';
 import { Proyect } from '../DTO/proyect';
-import { ColdObservable } from 'rxjs/internal/testing/ColdObservable';
 import { Plantilla } from '../DTO/plantilla';
 import { TareaPlantilla } from '../DTO/tarea-plantilla';
 import { LinkPlantilla } from '../DTO/link-plantilla';
