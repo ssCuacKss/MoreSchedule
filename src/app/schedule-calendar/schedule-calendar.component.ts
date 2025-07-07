@@ -184,6 +184,10 @@ import { Link } from '../DTO/link';
           <label for="autoDate">selección de fecha automática</label>
           <input type="datetime-local" #NPDateStart>
         </div>
+        <div id="quantity">
+          <label for="quantitySelector">Cantidad a fabricar </label>
+          <input type="number" id="quantitySelector" min="1" value="1" #quantitySelector>
+        </div>
         
       </ng-template>
 
@@ -247,7 +251,8 @@ export class ScheduleCalendarComponent implements OnInit{
   @ViewChild('salida') private salida!: ElementRef;
   @ViewChild('NPSPName') private entradaNPSP!: ElementRef;
   @ViewChild('NPSPDateStart') private dateStartNPSP!: ElementRef;
-  @ViewChild('NPDateStart') private dateStartNPCP!: ElementRef
+  @ViewChild('NPDateStart') private dateStartNPCP!: ElementRef;
+  @ViewChild('quantitySelector') private proyectQuantity!: ElementRef;
 
 
 
@@ -666,55 +671,59 @@ lightenColor(hex: string, percent: number): string {
 
   public async parsearPlantilla(plantilla: Plantilla){
     const date = (this.dateStartNPCP.nativeElement as HTMLInputElement).value;
-    if(date !== ""){
-      const tareasPlantilla: TareaPlantilla []= await this.proyects.GetTemplateTasks(plantilla.id).then((tareas: TareaPlantilla[]) => {
-        return tareas;
-      });
+    const ammout = parseInt((this.proyectQuantity.nativeElement as HTMLInputElement).value);
+    if(ammout >= 1){
 
-      const parsedTasks: Task[] = parseTemplateTasksToGanttTasks(tareasPlantilla, new Date(date));
+      if(date !== ""){
+        const tareasPlantilla: TareaPlantilla []= await this.proyects.GetTemplateTasks(plantilla.id).then((tareas: TareaPlantilla[]) => {
+          return tareas;
+        });
 
-      const linksPlantilla: LinkPlantilla[] = await this.proyects.GetTemplateLinks(plantilla.id).then((links: LinkPlantilla[])=>{
-        return links;
-      });
-      
-      const parsedLinks = linksPlantilla.map((link: LinkPlantilla)=>{
-        return {id: link.id, source: link.source, target: link.target, type: link.type} as Link;
-      });
+        const parsedTasks: Task[] = parseTemplateTasksToGanttTasks(tareasPlantilla, new Date(date));
 
-      let span = this.proyectSpan(parsedTasks);
+        const linksPlantilla: LinkPlantilla[] = await this.proyects.GetTemplateLinks(plantilla.id).then((links: LinkPlantilla[])=>{
+          return links;
+        });
+        
+        const parsedLinks = linksPlantilla.map((link: LinkPlantilla)=>{
+          return {id: link.id, source: link.source, target: link.target, type: link.type} as Link;
+        });
 
-      const newColor = this.getRandomHexColor();
-      const calendarEvent: CalendarEvent = {
-        id: Math.floor(Math.random() * 100000000),
-        start: new Date(date),
-        title: "Nuevo Proyecto",
-        end: addHours(date,span.hours),
-        color: {
-          primary: newColor.color,
-          secondary: newColor.dimmed
+        let span = this.proyectSpan(parsedTasks);
+
+        const newColor = this.getRandomHexColor();
+        const calendarEvent: CalendarEvent = {
+          id: Math.floor(Math.random() * 100000000),
+          start: new Date(date),
+          title: "Nuevo Proyecto",
+          end: addHours(date,span.hours),
+          color: {
+            primary: newColor.color,
+            secondary: newColor.dimmed
+          }
         }
-      }
-      const ProyectToSave: Proyect = {
-        id: calendarEvent.id as number,
-        start: format(calendarEvent.start, 'MM-dd-yyyy HH:mm'),
-        end: span.hours,
-        title: calendarEvent.title,
-        color: {
-          primary: calendarEvent.color!.primary,
-          secondary: calendarEvent.color!.secondary
+        const ProyectToSave: Proyect = {
+          id: calendarEvent.id as number,
+          start: format(calendarEvent.start, 'MM-dd-yyyy HH:mm'),
+          end: span.hours,
+          title: calendarEvent.title,
+          color: {
+            primary: calendarEvent.color!.primary,
+            secondary: calendarEvent.color!.secondary
+          }
         }
+        
+        await this.proyects.createProyect(ProyectToSave);
+
+        await this.proyects.SaveProyectTasksandLinks(ProyectToSave.id,parsedTasks,parsedLinks);
+
+        this.events.push(calendarEvent);
+
+        this.events = [...this.events];
+
+        this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: ProyectToSave.id, name: ProyectToSave.title}});
+
       }
-      
-      await this.proyects.createProyect(ProyectToSave);
-
-      await this.proyects.SaveProyectTasksandLinks(ProyectToSave.id,parsedTasks,parsedLinks);
-
-      this.events.push(calendarEvent);
-
-      this.events = [...this.events];
-
-      this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: ProyectToSave.id, name: ProyectToSave.title}});
-
     }
   
   }

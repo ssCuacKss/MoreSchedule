@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { MongoClient } = require('mongodb');
+const { isLeftHandSideExpression } = require('typescript');
 
 const MONGO_URL = 'mongodb://localhost:27017';
 const DB_NAME   = 'MoreScheduleDBdata';
@@ -17,11 +18,7 @@ async function main() {
     app.use(cors());
     app.use(express.json());
 
-    /**
-     * DELETE /tasks?pid=<pid>
-     * Borra todas las tareas con el pid especificado.
-     * Responde { deletedCount: N }.
-     */
+    
     function parsePid(req, res, next) {
         const pid = parseInt(req.query.pid, 10);
         if (isNaN(pid)) return res.status(400).json({ error: 'pid inválido' });
@@ -29,7 +26,11 @@ async function main() {
         next();
     }
 
-
+    /**
+     * DELETE /tasks?pid=<pid>
+     * Borra todas las tareas con el pid especificado.
+     * Responde { deletedCount: N }.
+     */
 
     app.delete('/proyect/delete', async (req, res) => {
 
@@ -91,35 +92,49 @@ async function main() {
     });
 
     app.get('/users', async (req, res) => {
-    try {
-        const users = await db
-        .collection('users')
-        .find()
-        .toArray();
-        return res.json(users);
-    } catch (err) {
-        console.error('Error leyendo users:', err);
-        return res.status(500).json({ error: 'Error interno al leer usuarios' });
-    }
+        try {
+            const users = await db
+            .collection('users')
+            .find()
+            .toArray();
+            return res.json(users);
+        } catch (err) {
+            console.error('Error leyendo users:', err);
+            return res.status(500).json({ error: 'Error interno al leer usuarios' });
+        }
     });
 
     app.get('/users/auth', async (req, res) => {
-    const { uname, pass } = req.query;
-    if (!uname || !pass) return res.status(400).end();
+        const { uname, pass } = req.query;
+        if (!uname || !pass) return res.status(400).end();
 
-    try {
-        const user = await db.collection('users')
-        .findOne({ 
-            uname: uname.toString().trim().toLowerCase(), 
-            pass: pass.toString().trim() 
-        });
-        if (!user) return res.status(404).end();
+        try {
+            const user = await db.collection('users')
+            .findOne({ 
+                uname: uname.toString().trim().toLowerCase(), 
+                pass: pass.toString().trim() 
+            });
+            if (!user) return res.status(404).end();
 
-        delete user.pass;
-        return res.json(user);
-    } catch (err) {
-        return res.status(500).json({ error: 'Error interno' });
-    }
+            delete user.pass;
+            return res.json(user);
+        } catch (err) {
+            return res.status(500).json({ error: 'Error interno' });
+        }
+    });
+
+    app.post('/users/create', async (req, res)=>{
+        const { uname, pass, admin } = req.body;
+        if(!uname || !pass || (admin === null)) return res.status(400).end();
+        try{
+            const inserted = await db.collection('users').
+            insertOne({uname: uname, pass: pass, admin: admin})
+            if(!inserted.insertedId) return res.status(404).end();
+            else return res.status(200).end();
+        }
+        catch (error){
+            return res.status(500).json({error: error});
+        }
     });
 
 

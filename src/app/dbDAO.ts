@@ -38,6 +38,11 @@ export class dbDAO {
     // 404 → usuario no encontrado / credenciales inválidas
     return undefined;
   }
+  
+  public async createUser(user: User): Promise<any> {
+    return await lastValueFrom(this.http.post<any>("http://localhost:3000/users/create",
+      user))
+  }
 
   public async GetCalendarConfig():Promise<CalendarConfig>{
     const data = (await fetch("http://localhost:3000/calendar/config")).json();

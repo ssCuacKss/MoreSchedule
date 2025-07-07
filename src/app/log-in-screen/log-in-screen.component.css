@@ -1,12 +1,18 @@
 form{
     display: flex;
     position: relative;
-    left: 50%;
-    top: 50vh;
-    transform: translate(-50%,-50%);
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+      box-shadow:
+    /* Capa principal: sombra nítida, más oscura y cercana */
+    0px 8px 20px rgba(0, 0, 0, 0.25),
+    /* Capa secundaria: sombra más amplia y difusa para “levantar” */
+    0px 16px 40px rgba(0, 0, 0, 0.15);
+
     flex-direction: column;
     width: 35%;
-    border: 1px solid black;
+    border: 1px double lightgray;
     border-radius: 20px;
     padding: 80px;
     padding-bottom: 25px;
@@ -23,6 +29,29 @@ input[type=submit]{
     position: relative;
     left: 50%;
     transform: translate(-50%);
+    color: #0d6efd;
+    background: transparent;
+    height: 3rem;
+    margin-right: 10px;
+    border-radius: 5pt;
+    transition: .6s;
+    border: none;
+}
+
+
+input[type=submit]:hover {
+  color: #0d6efd;
+  text-decoration: underline #0d6efd 1px;
+  border: 1px solid #0d6efd;
+  transition: .6s;
+  box-shadow: 5px 10px #0d6efd;
+}
+
+input[type=submit]:active {
+  box-shadow: none;
+  background-color: rgb(247, 212, 212);
+  color: #0d6efd;
+  text-decoration: underline #0d6efd 1px;
 }
 
 .passwordField{
@@ -48,8 +77,8 @@ input[type=submit]{
     border-radius: 2px;
     display: flex;
     flex-wrap: nowrap;
+    background-color: whitesmoke;
     padding: 2px;
-
     
 }
 
@@ -72,4 +101,19 @@ input[type=submit]{
     opacity: 0;
     transition: 1s;
     pointer-events: none;
+}
+
+.loginInfo {
+    background: linear-gradient(
+    to bottom right,
+    #0d6efd 15%,
+    whitesmoke 60%
+  );
+  
+  min-height: 100vh;
+  
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

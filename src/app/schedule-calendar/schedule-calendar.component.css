@@ -209,7 +209,6 @@
   margin-right: 10px;
   border-radius: 5pt;
   transition: .6s initial;
-
 }
 
 .closeButton:hover {
@@ -471,6 +470,11 @@ input[type="submit"]:active{
   column-gap: 6px;
 }
 
+.templateData h4{ 
+  min-width: 10rem;
+  max-width: 10rem;
+}
+
 .templateData{
   border-bottom: 1px solid black;
 }
@@ -575,6 +579,8 @@ input[type="submit"]:active{
 
 .templateSelect h4{
   align-self: center;
+  max-width: 15rem;
+  min-width: 15rem;
 }
 
 .templateSelect:last-child{
@@ -610,6 +616,16 @@ input[type="submit"]:active{
   flex-direction: row;
   gap: 1rem;
   justify-content: center;
+}
+
+#quantity{
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+#quantitySelector{
+  text-align: center;
 }
 /*reglas de estiolo para nuevo proyecto sin plantilla*/
 

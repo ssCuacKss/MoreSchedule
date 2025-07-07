@@ -54,6 +54,7 @@ export class LogInScreenComponent {
     if(this.cookie.get('Test').valueOf() === 'ALLOWEDTOLOGIN'){
       //this.router.navigate(['/Calendar'])
     }
+    //this.user.createUser({uname: "pancracio", pass: "Pancracio12345cul", admin: false});
   }
 
   public updateAreaType(event: Event){
