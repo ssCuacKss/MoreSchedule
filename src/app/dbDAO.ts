@@ -1,15 +1,13 @@
 import { inject, Injectable } from '@angular/core';
-import { DataBaseRawData } from './data-base-raw-data';
 import { User } from './DTO/user';
-import { addHours, parse, format } from 'date-fns';
+import { addHours } from 'date-fns';
 import { CalendarEvent } from 'angular-calendar';
 import { Proyect } from './DTO/proyect';
 import { Task } from './DTO/task';
 import { Link } from './DTO/link';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, forkJoin, lastValueFrom} from 'rxjs';
+import { Observable, lastValueFrom} from 'rxjs';
 import {map} from 'rxjs/operators'
-import { AnyCatcher } from 'rxjs/internal/AnyCatcher';
 import { CalendarConfig } from './DTO/calendar-config' ;
 import { Plantilla } from './DTO/plantilla';
 import { TareaPlantilla } from './DTO/tarea-plantilla';
@@ -21,7 +19,6 @@ import { LinkPlantilla } from './DTO/link-plantilla';
 export class dbDAO {
 
   private url: string = "http://localhost:3000/";
-  private tasksList: DataBaseRawData[] = [];
   private http: HttpClient = inject(HttpClient);
 
   constructor() { }
@@ -38,10 +35,36 @@ export class dbDAO {
     // 404 → usuario no encontrado / credenciales inválidas
     return undefined;
   }
+
+    public async GetUsers(): Promise<User[]> {
+    
+    const res = await fetch(`http://localhost:3000/users`);
+    if (res.status === 200) {
+      return await res.json() as User[];
+    }
+    // 404 → usuario no encontrado / credenciales inválidas
+    return [];
+  }
   
   public async createUser(user: User): Promise<any> {
     return await lastValueFrom(this.http.post<any>("http://localhost:3000/users/create",
       user))
+  }
+
+  public async deleteUser(user: User):Promise<any>{
+    const params = new URLSearchParams({
+      uname: user.uname,
+      pass: user.pass
+    });
+    return await lastValueFrom(this.http.delete<any>(`http://localhost:3000/user/delete?${params}`))
+  }
+
+  public async updateUsers(user: User, update: User):Promise<any>{
+    const body = {
+      user: user,
+      update: update
+    };
+    return await lastValueFrom(this.http.post<any>(`http://localhost:3000/user/update?`, body))
   }
 
   public async GetCalendarConfig():Promise<CalendarConfig>{
@@ -88,13 +111,14 @@ export class dbDAO {
     let data = await fetch("http://localhost:3000/tasks?pid=" + id);
     let tasks = await data.json();
     let parsedTasks: Task [] = [];
-    tasks.forEach((task: any) => {
+    tasks.forEach((task: Task) => {
       parsedTasks.push(
         {
           id: task.id,
           text: task.text,
           start_date: task.start_date,
-          duration: task.duration
+          duration: task.duration,
+          users: task.users ?? []
         }
       )
     });
@@ -126,7 +150,7 @@ export class dbDAO {
     tasks: any[],
     rels:  any[]
   ): Promise<void> {
-    const cleanTasks = tasks.map(({ color, end_date, parent, progress, ...t }) => t);
+  const cleanTasks = tasks;
   // si tus links no tienen esas props, puedes omitir este paso para ellos
   const cleanRels  = rels; 
 
@@ -347,7 +371,8 @@ export class dbDAO {
           id: task.id,
           text: task.text,
           start_date: task.start_date,
-          duration: task.duration
+          duration: task.duration,
+          user_count: task.user_count
         }
       )
     });
@@ -371,7 +396,7 @@ export class dbDAO {
         }
       )
     });
-
+    
     return parsedLinks ?? [];
   }
 }

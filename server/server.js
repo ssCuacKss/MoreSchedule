@@ -104,6 +104,57 @@ async function main() {
         }
     });
 
+    app.delete('/user/delete', async (req, res) => {
+        try{
+            const result = await db.collection('users').deleteOne({ uname: req.query.uname.toString().trim() });
+            return res.status(200).json({ deletedCount: result.deletedCount });
+        }catch(err){
+            return res.status(500).json({error: err});
+        }
+        
+    });
+
+    app.post('/user/update', async (req, res) => {
+        const { user, update } = req.body;
+
+        const isValidUser = (u) =>
+            u && typeof u.uname === 'string' && typeof u.pass === 'string' && typeof u.admin === 'boolean';
+
+        if (!isValidUser(user) || !isValidUser(update)) {
+            return res.status(400).json({ error: 'user y update deben tener uname, pass y admin válidos' });
+        }
+
+        const uname = user.uname.trim().toLowerCase();
+        const pass  = user.pass.trim();
+
+        try {
+            // Intentar borrar el usuario original
+            const deleteResult = await db.collection('users').deleteOne({
+                uname: uname,
+                pass:  pass
+            });
+
+            if (deleteResult.deletedCount === 0) {
+                return res.status(404).json({ error: 'Usuario original no encontrado' });
+            }
+
+            // Insertar el nuevo usuario actualizado
+            await db.collection('users').insertOne({
+                uname: update.uname.trim().toLowerCase(),
+                pass:  update.pass.trim(),
+                admin: update.admin,
+                disponible: update.disponible,
+                tareas: update.tareas
+            });
+
+            return res.status(200).json({ message: 'Usuario actualizado con éxito' });
+
+        } catch (err) {
+            console.error('Error en /users/update:', err);
+            return res.status(500).json({ error: 'Error interno al actualizar usuario' });
+        }
+    });
+
     app.get('/users/auth', async (req, res) => {
         const { uname, pass } = req.query;
         if (!uname || !pass) return res.status(400).end();
@@ -124,11 +175,12 @@ async function main() {
     });
 
     app.post('/users/create', async (req, res)=>{
-        const { uname, pass, admin } = req.body;
+        
+        const { uname, pass, admin, disponible } = req.body;
         if(!uname || !pass || (admin === null)) return res.status(400).end();
         try{
             const inserted = await db.collection('users').
-            insertOne({uname: uname, pass: pass, admin: admin})
+            insertOne({uname: uname, pass: pass, admin: admin, disponible: disponible})
             if(!inserted.insertedId) return res.status(404).end();
             else return res.status(200).end();
         }
@@ -137,6 +189,7 @@ async function main() {
         }
     });
 
+    
 
     app.get('/proyects', async (req, res) => {
         
@@ -200,7 +253,8 @@ async function main() {
                 typeof t.id  !== 'number' ||
                 typeof t.text!== 'string' ||
                 typeof t.start_date !== 'string' ||
-                typeof t.duration   !== 'number'
+                typeof t.duration   !== 'number' ||
+                !Array.isArray(t.users)
             ) {
             return res.status(400).json({
                 error: 'Cada tarea debe tener pid(number), id(number), text(string), start_date(string), duration(number)'
@@ -214,7 +268,8 @@ async function main() {
                 id:  t.id,
                 text: t.text,
                 start_date: t.start_date,
-                duration:   t.duration
+                duration:   t.duration,
+                users: t.users
             }));
             const result = await db.collection('tasks').insertMany(toInsert);
             return res.status(201).json({
@@ -437,7 +492,8 @@ async function main() {
                 typeof t.id  !== 'number' ||
                 typeof t.text!== 'string' ||
                 typeof t.start_date !== 'number' ||
-                typeof t.duration   !== 'number'
+                typeof t.duration   !== 'number' ||
+                typeof t.user_count !== 'number'
             ) {
             return res.status(400).json({
                 error: 'Cada tarea debe tener tid(number), id(number), text(string), start_date(string), duration(number)'
@@ -451,7 +507,8 @@ async function main() {
                 id:  t.id,
                 text: t.text,
                 start_date: t.start_date,
-                duration:   t.duration
+                duration:   t.duration,
+                user_count: t.user_count
             }));
             const result = await db.collection('TemplateTasks').insertMany(toInsert);
             return res.status(201).json({

@@ -1,12 +1,12 @@
-import { AfterViewInit, Component, ElementRef, EventEmitter, inject, LOCALE_ID, OnInit, viewChild, ViewChild } from '@angular/core';
-import { CalendarA11y, CalendarDateFormatter, CalendarEvent, CalendarModule, CalendarMonthViewDay } from 'angular-calendar';
+import { Component, ElementRef, inject, LOCALE_ID, OnInit, ViewChild } from '@angular/core';
+import { CalendarDateFormatter, CalendarEvent, CalendarModule, CalendarMonthViewDay } from 'angular-calendar';
 import { SchedulerDateFormatter, SchedulerModule } from 'angular-calendar-scheduler';
 import { startOfDay, addHours, addMonths, subMonths, isSameMonth, isSameDay, format, add, addMinutes} from 'date-fns';
 import { Router } from '@angular/router';
-import { CommonModule, CurrencyPipe, registerLocaleData } from '@angular/common';
+import { CommonModule, registerLocaleData } from '@angular/common';
 import localeEs from '@angular/common/locales/es';
 import { DOCUMENT } from '@angular/common';
-import { ReactiveFormsModule } from '@angular/forms';
+import { ReactiveFormsModule} from '@angular/forms';
 import { FormGroup, FormControl } from '@angular/forms';
 import { dbDAO } from '../dbDAO';
 import { CalendarConfig } from '../DTO/calendar-config';
@@ -17,6 +17,9 @@ import { LinkPlantilla } from '../DTO/link-plantilla';
 import { parseTemplateTasksToGanttTasks } from '../schedule-chart/schedule-chart.component';
 import { Task } from '../DTO/task';
 import { Link } from '../DTO/link';
+import { User } from '../DTO/user';
+
+
 
 
 
@@ -31,7 +34,7 @@ import { Link } from '../DTO/link';
           <li (click)="openMenu($event)" class="item" id="menu-one">Proyectos
             <ul class="closed">
               <li (click)="selectOption('NuevoProyecto')">Nuevo Proyecto</li>
-              <li (click)="selectOption('NuevoProyectoSP')">Nuevo Proyecto sin Plantilla</li>
+              <!--<li (click)="selectOption('NuevoProyectoSP')">Nuevo Proyecto sin Plantilla</li>-->
             </ul>
           </li>
           <li (click)="openMenu($event)" class="item" id="menu-two">Plantillas
@@ -97,7 +100,7 @@ import { Link } from '../DTO/link';
         </div>
       <ng-template #calendarConfig>
         <h3>Horas de trabajo</h3>
-          <div class="workHours">
+          <div class="workHours">ElegirPlantilla(plantilla)
             <p>Entrada</p>
             <p></p>
             <p>Salida</p>
@@ -132,31 +135,47 @@ import { Link } from '../DTO/link';
 
       <ng-template #createUser>
         <h3>Datos de Usuario</h3>
-        <form [formGroup]="crearUsuario" class="formulario">
+        <form [formGroup]="crearUsuario" class="formulario" >
           <label for="nombre" class="dataField">Nombre de usuario: </label>
-          <input type="text" name="nombre" placeholder="Con numeros y letras minusculas (al menos un caracter)">
+          <input type="text" id="nombre" placeholder="Con letras minusculas (al menos un caracter)" formControlName="nombre">
           <label class="dataField" for="password">Contraseña: </label>
-          <input type="text" name="password" placeholder="Mayusculas, minusculas y letras (al menos 4 caracteres)">
+          <input type="text" name="password" placeholder="Mayusculas, minusculas y números (al menos 4 caracteres)" formControlName="password">
           <div id="contenedorAdmin">
-            <input type="checkbox" name="admin">
+            <input type="checkbox" id="admin" formControlName="admin">
             <label for="admin">Crear como administrador</label>
           </div>
-          <input type="submit" value="Registrar">
+          <div class="hidden" #errorMessage></div>
+          <input type="submit" value="Registrar" (click)="uploadNewUser()">
         </form>
       </ng-template>
 
       <ng-template #editUser>
         <h3>Editar Usuario</h3>
         <div class="listUsers">
-              <div class="userData" *ngFor="let fechas of fechasFestivos; index as i">
-                  <input type="text">
-                  <input type="text">
-                  <input type="checkbox" name="admin">
-                  <label for="admin">Administrador</label>
-                  <input type="button" value="eliminar">
+          <div class="userData" *ngFor="let user of usuariosFront; index as i">
+            <h4>{{user.uname}}</h4>
+            <h4>{{user.pass}}</h4>
+            <div id="editAlternatives">
+            <div>
+              <input type="checkbox" id="admin" [checked]="user.admin" (click)="actualizarAdmin($event, i)">
+              <label for="admin">Administrador</label>
+            </div>
+            <div>
+              <input type="checkbox" id="disponible" [checked]="user.disponible" (click)="actualizarDisponible($event, i)">
+              <label for="disponible">Disponible</label>
+            </div>
+            </div>   
+            <input type="button" value="eliminar" (click)="eliminarUsuario(user, i)" >
+            <div id="operatorTasks" *ngIf="(user.disponible && user.tareas !== undefined && user.tareas !== null && user.tareas.length !== 0)">
+            <div class="tareasEnLinea">
+              <div *ngFor="let tarea of user.tareas; index as j">
+                [Tarea: {{tarea.tarea}} - termina: {{tarea.acaba}}]
               </div>
+            </div>
+            </div>
+          </div>
         </div>
-        <input type="button" value="agregar" class="confirmChanges">
+        <input type="button" value="agregar" class="confirmChanges" (click)="actualizarUsuarios()">
 
       </ng-template>
 
@@ -176,17 +195,16 @@ import { Link } from '../DTO/link';
         <div class="listSelect">
               <div class="templateSelect" *ngFor="let plantilla of plantillas; index as i">
                   <h4>{{plantilla.title}}</h4>
-                  <input type="button" value="Usar Plantilla" id="editar" (click)="parsearPlantilla(plantilla)">
+                  <input type="button" value="Usar Plantilla" id="editar" (click)="elegirPlantilla(plantilla)">
               </div>
         </div>
         <div class="dateStartSelector">
-          <input type="checkbox" #checkAuto id="autoDate" (click)="autoClicked($event, 'NP_CP')">
+          <input type="checkbox" #checkAuto id="autoDate" (click)="autoClicked($event)">
           <label for="autoDate">selección de fecha automática</label>
           <input type="datetime-local" #NPDateStart>
         </div>
         <div id="quantity">
-          <label for="quantitySelector">Cantidad a fabricar </label>
-          <input type="number" id="quantitySelector" min="1" value="1" #quantitySelector>
+          <input type="button" id="quantitySelector" #proyectAddFromTemplate value="Crear Proyecto" (click)="parsearPlantilla()">
         </div>
         
       </ng-template>
@@ -198,7 +216,7 @@ import { Link } from '../DTO/link';
               <input type="text" #textInputProyectName id="inputName" #NPSPName>
         </div>
         <div class="dateStartSelector">
-          <input type="checkbox" id="autoDate" (click)="autoClicked($event, 'NP_SP')">
+          <input type="checkbox" id="autoDate" (click)="autoClicked($event)">
           <label for="autoDate">selección de fecha automática</label>
           <input type="datetime-local" #NPSPDateStart>
         </div>
@@ -237,8 +255,9 @@ export class ScheduleCalendarComponent implements OnInit{
   private proyects: dbDAO = inject(dbDAO);
   public calendarConfigData!: CalendarConfig;
   public plantillas!: Plantilla[];
-
-  public fechasFestivos: {inicio: Date, fin:Date}[] = [ {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}, {inicio: new Date(), fin: new Date()}];
+  private users!: User[];
+  public usuariosFront!: User[];
+  private plantillaElegida?: Plantilla = undefined;
   
   @ViewChild("config") private config!: ElementRef;
   @ViewChild("nav") private nav!: ElementRef;
@@ -252,18 +271,21 @@ export class ScheduleCalendarComponent implements OnInit{
   @ViewChild('NPSPName') private entradaNPSP!: ElementRef;
   @ViewChild('NPSPDateStart') private dateStartNPSP!: ElementRef;
   @ViewChild('NPDateStart') private dateStartNPCP!: ElementRef;
-  @ViewChild('quantitySelector') private proyectQuantity!: ElementRef;
-
+  @ViewChild('proyectAddFromTemplate') private proyectQuantity!: ElementRef;
+  @ViewChild('errorMessage') private errorMessage!: ElementRef;
 
 
   public crearUsuario: FormGroup =  new FormGroup({
-    //nombre: new FormControl(''),
-  })
+    nombre: new FormControl(''),
+    password: new FormControl(''),
+    admin: new FormControl(false)
+  });
 
   events: CalendarEvent[] = [];
 
   constructor(){
     registerLocaleData(localeEs);
+    
     
   }
 
@@ -276,7 +298,11 @@ export class ScheduleCalendarComponent implements OnInit{
       this.calendarConfigData = await this.proyects.GetCalendarConfig().then((config: CalendarConfig) => {
         return config;
       });
-  }
+
+      this.users = await this.proyects.GetUsers().then((users: User[])=>{return users})
+      this.usuariosFront = this.users.map(user => ({ ...user }));
+      console.log(this.usuariosFront);
+    }
 
   async downloadEvents(){
     let dbproyects = await this.proyects.GetProyects();
@@ -298,7 +324,7 @@ export class ScheduleCalendarComponent implements OnInit{
     
     if(isSameMonth(dia.date, this.viewDate)){
       
-      if((isSameDay(dia.date, this.viewDate) && this.activeDayIsOpen )|| dia.events.length === 0){
+      if((isSameDay(dia.date, this.viewDate) && this.activeDayIsOpen ) || dia.events.length === 0){
         this.activeDayIsOpen = false;
       }else{
         this.activeDayIsOpen = true;
@@ -452,10 +478,15 @@ export class ScheduleCalendarComponent implements OnInit{
       if(configBody){
         configBody.className = "configBodyDisabled";
       }
+      try{
+        const errorMessageElement = this.errorMessage.nativeElement as HTMLDivElement;
+        errorMessageElement.className = "hidden";
+      }catch(error: any){
+        
+      }
       closeButton.setAttribute("disabled", "");
     }
   }
-
 
 
   getRandomHexColor(): { color: string; dimmed: string } {
@@ -554,16 +585,104 @@ lightenColor(hex: string, percent: number): string {
     this.calendarConfigData.festivos.splice(listIndex, 1);
   }
 
-  public autoClicked(event: Event, mode: string){
+  
+
+  public async autoClicked(event: Event){
+
+    
 
     const clicked = (event.target as HTMLInputElement).checked;
 
-    const fecha = mode === 'NP_SP' ? (this.dateStartNPSP.nativeElement as HTMLInputElement) : (this.dateStartNPCP.nativeElement as HTMLInputElement)
+    const currentDate: Date = new Date();
 
-    const currentDate = new Date();
+    const fecha =  this.dateStartNPCP.nativeElement as HTMLInputElement;
+
+    let bestStartDate = new Date();
+
+    if(this.plantillaElegida === undefined){
+      return
+    }
+
+    const updatedUsers: User[] = this.users.map(user => ({
+      ...user,
+      tareas: user.tareas ? user.tareas.map(t => ({ ...t })) : []
+    }));
+
+    bestStartDate = new Date();
+    //console.log("usuarios", updatedUsers);
+
+    //console.log("startDate inicial");
+    for(let i: number = 0; i < updatedUsers.length; i++){
+      if(!updatedUsers[i].disponible){
+        continue;
+      }
+      let tareas = updatedUsers[i].tareas
+      if(tareas !== undefined && tareas !== null && tareas.length > 0){
+        let candidate: Date = new Date(tareas[0].acaba) 
+        if(candidate > bestStartDate){
+          bestStartDate = candidate;
+        }
+      }else{
+        bestStartDate = new Date();
+        break;
+      }
+
+    }
+
+    //console.log(bestStartDate);
+
+    const tareasPlantilla: TareaPlantilla[] = await this.proyects.GetTemplateTasks(this.plantillaElegida!.id);
+    
+    const linksPlantilla: LinkPlantilla[] = await this.proyects.GetTemplateLinks(this.plantillaElegida!.id);
+    
+    
 
 
-    let events = [...this.events];
+    const parsedLinks = linksPlantilla.map((link: LinkPlantilla) => ({
+      id: link.id,
+      source: link.source,
+      target: link.target,
+      type: link.type
+    } as Link));
+
+    let asignable:boolean = false;
+
+    while(!asignable){
+      const parsedTasks: Task[] = parseTemplateTasksToGanttTasks(tareasPlantilla, bestStartDate);
+      const span = this.proyectSpan(parsedTasks);
+      
+      const ProyectToSave: Proyect = {
+        id: Math.floor(Math.random() * 100000000),
+        start: format(bestStartDate,'MM-dd-yyyy HH:mm'),
+        title: "Nuevo Proyecto",
+        end: span.hours,
+        color: {
+          primary: 'ffffff',
+          secondary: 'ffffff'
+        }
+      };
+
+      let copiaTasks = parsedTasks.map((task:Task)=>{
+        return task;
+      });
+      let copiaLinks = parsedLinks.map((link:Link)=>{
+        return link;
+      });
+
+       asignable = this.addUsersToTasks(updatedUsers, copiaTasks, ProyectToSave, copiaLinks, tareasPlantilla);
+
+       if(!asignable){
+        bestStartDate = new Date(bestStartDate.getTime() + 3600000);
+       }
+    }
+
+    //console.log("startdate final", bestStartDate);
+
+    //console.log(bestStartDate,format(bestStartDate, "yyyy-MM-dd HH:mm"));
+
+    fecha.value = format(bestStartDate, "yyyy-MM-dd HH:mm");
+
+    /*let events = [...this.events];
     if(clicked){
         events.forEach((e: CalendarEvent) => {
         if((e.end ?? "") < currentDate){
@@ -587,7 +706,7 @@ lightenColor(hex: string, percent: number): string {
       }
     }else{
       fecha.value = "";
-    }
+    }*/
   }
 
   public async iniciarProyecto(){
@@ -669,63 +788,168 @@ lightenColor(hex: string, percent: number): string {
     this.router.navigate(['/proyectSchdedule'], {queryParams:{id: plantilla.id ,title: "EditarPlantilla"}});
   }
 
-  public async parsearPlantilla(plantilla: Plantilla){
-    const date = (this.dateStartNPCP.nativeElement as HTMLInputElement).value;
-    const ammout = parseInt((this.proyectQuantity.nativeElement as HTMLInputElement).value);
-    if(ammout >= 1){
+  public async parsearPlantilla() {
+  const date = (this.dateStartNPCP.nativeElement as HTMLInputElement).value;
 
-      if(date !== ""){
-        const tareasPlantilla: TareaPlantilla []= await this.proyects.GetTemplateTasks(plantilla.id).then((tareas: TareaPlantilla[]) => {
-          return tareas;
-        });
+  const updatedUsers: User[] = this.users.map(user => ({
+    ...user,
+    tareas: user.tareas ? user.tareas.map(t => ({ ...t })) : []
+  }));
 
-        const parsedTasks: Task[] = parseTemplateTasksToGanttTasks(tareasPlantilla, new Date(date));
+  if (date !== "" || this.plantillaElegida !== undefined) {
+    const tareasPlantilla: TareaPlantilla[] = await this.proyects.GetTemplateTasks(this.plantillaElegida!.id);
+    const parsedTasks: Task[] = parseTemplateTasksToGanttTasks(tareasPlantilla, new Date(date));
+    const linksPlantilla: LinkPlantilla[] = await this.proyects.GetTemplateLinks(this.plantillaElegida!.id);
+    
+    const parsedLinks = linksPlantilla.map((link: LinkPlantilla) => ({
+      id: link.id,
+      source: link.source,
+      target: link.target,
+      type: link.type
+    } as Link));
 
-        const linksPlantilla: LinkPlantilla[] = await this.proyects.GetTemplateLinks(plantilla.id).then((links: LinkPlantilla[])=>{
-          return links;
-        });
-        
-        const parsedLinks = linksPlantilla.map((link: LinkPlantilla)=>{
-          return {id: link.id, source: link.source, target: link.target, type: link.type} as Link;
-        });
+    const span = this.proyectSpan(parsedTasks);
+    const newColor = this.getRandomHexColor();
 
-        let span = this.proyectSpan(parsedTasks);
+    const calendarEvent: CalendarEvent = {
+      id: Math.floor(Math.random() * 100000000),
+      start: new Date(date),
+      title: "Nuevo Proyecto",
+      end: addHours(date, span.hours),
+      color: {
+        primary: newColor.color,
+        secondary: newColor.dimmed
+      }
+    };
 
-        const newColor = this.getRandomHexColor();
-        const calendarEvent: CalendarEvent = {
-          id: Math.floor(Math.random() * 100000000),
-          start: new Date(date),
-          title: "Nuevo Proyecto",
-          end: addHours(date,span.hours),
-          color: {
-            primary: newColor.color,
-            secondary: newColor.dimmed
-          }
-        }
-        const ProyectToSave: Proyect = {
-          id: calendarEvent.id as number,
-          start: format(calendarEvent.start, 'MM-dd-yyyy HH:mm'),
-          end: span.hours,
-          title: calendarEvent.title,
-          color: {
-            primary: calendarEvent.color!.primary,
-            secondary: calendarEvent.color!.secondary
-          }
-        }
-        
-        await this.proyects.createProyect(ProyectToSave);
+    const ProyectToSave: Proyect = {
+      id: calendarEvent.id as number,
+      start: format(calendarEvent.start, 'MM-dd-yyyy HH:mm'),
+      end: span.hours,
+      title: calendarEvent.title,
+      color: {
+        primary: calendarEvent.color!.primary,
+        secondary: calendarEvent.color!.secondary
+      }
+    };
 
-        await this.proyects.SaveProyectTasksandLinks(ProyectToSave.id,parsedTasks,parsedLinks);
+    let copiaTasks = parsedTasks;
+    let copiaLinks = parsedLinks;
 
-        this.events.push(calendarEvent);
+    const asignado = this.addUsersToTasks(updatedUsers, copiaTasks, ProyectToSave, copiaLinks, tareasPlantilla);
 
-        this.events = [...this.events];
+    if (!asignado) {
+      return;
+    }
 
-        this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: ProyectToSave.id, name: ProyectToSave.title}});
+    // ✅ Asignamos la copia modificada para mostrar en UI
+    this.usuariosFront = updatedUsers;
 
+    //console.log(this.users, this.usuariosFront);
+
+    await this.proyects.createProyect(ProyectToSave);
+    await this.proyects.SaveProyectTasksandLinks(ProyectToSave.id, parsedTasks, parsedLinks);
+    await this.actualizarUsuarios();
+
+    this.users = this.usuariosFront.map(user => ({
+      ...user,
+      tareas: user.tareas ? user.tareas.map(t => ({ ...t })) : []
+    }));
+
+    this.events.push(calendarEvent);
+    this.events = [...this.events];
+    this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: ProyectToSave.id, name: ProyectToSave.title}});
+
+    }
+    else{
+      //console.log(date, this.plantillaElegida);
+      return;
+    }
+  }
+/*
+  private getDependentTaskObjects(task: Task, tasks: Task[], links: Link[]): Task[] {
+    const dependentsMap = new Map<number, number[]>();
+
+    for (const link of links) {
+      if (!dependentsMap.has(link.source)) {
+        dependentsMap.set(link.source, []);
+      }
+      dependentsMap.get(link.source)!.push(link.target);
+    }
+
+    const resultIds = new Set<number>();
+    const visited = new Set<number>();
+    const stack = [task.id];
+
+    while (stack.length > 0) {
+      const currentId = stack.pop()!;
+      if (visited.has(currentId)) continue;
+      visited.add(currentId);
+
+      const children = dependentsMap.get(currentId) || [];
+
+      for (const childId of children) {
+        resultIds.add(childId);
+        stack.push(childId);
       }
     }
-  
+
+    const dependents = tasks.filter(t => resultIds.has(t.id));
+    return dependents;
+  }
+*/
+  public elegirPlantilla(plantilla: Plantilla){
+    this.plantillaElegida = plantilla;
+  }
+  private addUsersToTasks(usersForTasks: User[], tasks: Task[], proyect: Proyect, links: Link[], plantillasTarea: TareaPlantilla[]): boolean{
+
+
+    tasks.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+    //console.log(this.getDependentTaskObjects(tasks[0], tasks, links));
+    for(let j = 0; j < tasks.length; j++){
+      let foundCandidates = 0;
+      let task = tasks[j];
+      let tareaCountPlantilla = plantillasTarea.find((tarea: TareaPlantilla) =>
+        tarea.id === task.id
+      );
+      let userCountPlantilla = tareaCountPlantilla!.user_count;
+      
+      for(let i = 0; i < usersForTasks.length; i++){
+        let user = usersForTasks[i];
+        if(!user.disponible){
+          continue;
+        }
+        else if(user.tareas === undefined || user.tareas === null || user.tareas.length === 0){
+          
+          foundCandidates++;
+          user.tareas = [];
+          user.tareas.push({tarea: task.text, acaba: format(new Date(new Date(task.start_date).getTime() + task.duration * 60000), "yyyy-MM-dd HH:mm"), pid: proyect.id });
+          task.users.push({uname: user.uname});
+          
+        
+        }else if (new Date(user.tareas[0].acaba) <= new Date(task.start_date)) {
+          const taskStart = new Date(task.start_date);
+          const taskEnd = new Date(taskStart.getTime() + task.duration * 60000);
+          const endFormatted = format(taskEnd, "yyyy-MM-dd HH:mm");
+
+          user.tareas.unshift({tarea: task.text,acaba: endFormatted,pid: proyect.id});
+
+          task.users.push({uname: user.uname});
+          foundCandidates++;
+          
+        }
+
+        if(foundCandidates >= userCountPlantilla){
+          break;
+        }
+
+      }
+      if(foundCandidates < userCountPlantilla){
+        //console.log(`No hay usuarios para la tarea ${task.text}. Abortar`);
+        return false;
+      }
+    }
+    return true;
   }
 
   proyectSpan(tareas: Task[]):{startDate: Date, hours: number}{
@@ -752,6 +976,119 @@ lightenColor(hex: string, percent: number): string {
     //console.log(Math.ceil((latestEnd.getTime() - earliestStart.getTime())/3600000));
 
     return { startDate: earliestStart, hours: Math.ceil((latestEnd.getTime() - earliestStart.getTime())/3600000) };
+  }
+  
+  public checkValidCredentials(uname: string, pass: string, admin: boolean): {result: boolean, error: string}{
+
+    
+    let invalid: boolean = false;
+    let messageText: string = "";
+
+    const regex: RegExp[] = [
+    /(?=.*[A-Z])(?=.*[0-9]).{4,}/,
+    /^[a-z]+$/
+  ]
+
+    if(!regex[1].test(uname)){
+      messageText = "El formato de nombre no es correcto";
+      invalid = true;
+    }
+    if(!regex[0].test(pass)){
+      if(messageText.length !== 0){
+        messageText += "\n";
+      }
+      messageText += "El formato de contraseña no es correcto";
+      
+      invalid = true;
+    }
+    if(invalid){
+      return {result: false, error: messageText};
+    }
+    let duplicateUser: boolean = false;
+    this.users.forEach((user: User)=>{
+      if(uname === user.uname){
+        duplicateUser = true;
+      }
+    });
+    if(duplicateUser){  
+      messageText = "El usuario ya existe";
+      return {result: false, error: messageText};
+    }
+    
+    return {result: true, error: ""};
+  }
+  public async uploadNewUser(){
+    const uname: string = this.crearUsuario.get("nombre")?.value;
+    const pass: string = this.crearUsuario.get("password")?.value;
+    const admin: boolean = this.crearUsuario.get("admin")?.value;
+    const errorMessageElement = this.errorMessage.nativeElement as HTMLDivElement;
+
+    
+
+    let isValid: {result: boolean, error: string} = await this.checkValidCredentials(uname, pass, admin);
+
+    if(isValid.result){
+      const newUser: User = {uname: uname, pass: pass, admin: admin, disponible: false};
+      await this.proyects.createUser(newUser);
+      this.users.push(newUser);
+      this.usuariosFront.push(newUser);
+      this.enableView();
+    }else{
+      errorMessageElement.className = "errorMessage";
+      errorMessageElement.innerText = isValid.error;
+    }
+    
+
+  }
+  public async eliminarUsuario(usuario: User, index: number){
+    
+    await this.proyects.deleteUser(usuario);
+
+    this.users.splice(index, 1);
+    this.usuariosFront = this.users.map(user => ({ ...user }));
+
+  }
+
+  public actualizarAdmin(event: Event, index: number){
+
+    const check = event.currentTarget as HTMLInputElement;
+
+    this.usuariosFront[index].admin = check.checked;
+
+
+  }
+
+    public actualizarDisponible(event: Event, index: number){
+
+    const check = event.currentTarget as HTMLInputElement;
+
+    this.usuariosFront[index].disponible = check.checked;
+
+
+  }
+
+  public actualizarUsuarios(){
+  
+    const toCompare = this.users.length;
+    //console.log(this.usuariosFront, this.users);
+
+
+    const ammountToCompare = this.users.length;
+
+    for(let i: number = 0; i < ammountToCompare; i++){
+      let index: number = this.users.findIndex((user: User) => user.uname === this.usuariosFront[i].uname && user.pass === this.usuariosFront[i].pass);
+      if(index >= 0 && ( this.usuariosFront[i].admin !== this.users[index].admin) || (this.usuariosFront[i].disponible !== this.users[index].disponible) || ((this.usuariosFront[i].tareas?.length ?? 0 )!== (this.users[index].tareas?.length ?? 0))){
+        this.proyects.updateUsers(this.users[index], this.usuariosFront[i]);
+      }
+    }
+
+    //for(let i: number = 0; i < toCompare; i++){
+    //  if((this.usuariosFront[i].uname !== this.users[i].uname) || (this.usuariosFront[i].pass !== this.users[i].pass) || (this.usuariosFront[i].admin !== this.users[i].admin) || (this.usuariosFront[i].disponible !== this.users[i].disponible)){
+    //    this.proyects.updateUsers(this.users[i], this.usuariosFront[i]);
+    //    //console.log("algo está cambiado, esto interesea hacerle update: ",this.usuariosFront[i]);
+    //  }
+    //}
+
   }
 
 }

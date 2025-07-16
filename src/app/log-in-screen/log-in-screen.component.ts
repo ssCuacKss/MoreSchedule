@@ -42,7 +42,7 @@ export class LogInScreenComponent {
 
   private readonly regex: RegExp[] = [
     /(?=.*[A-Z])(?=.*[0-9]).{4,}/,
-    /(?=.[a-z]*)(?=.*[^A-Z]).+/
+    /(?=.[a-z]*)(?=.[^A-Z]*).+/
   ]
 
   loginInfo: FormGroup = new FormGroup({

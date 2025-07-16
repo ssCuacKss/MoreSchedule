@@ -151,6 +151,7 @@
 .configPanel {
   min-width: 35rem;
   min-height: fit-content;
+  max-width: 35rem;
   border: 1px solid black;
   position: absolute;
   top: 50%;
@@ -359,19 +360,39 @@
 #contenedorAdmin{
   display: flex;
   flex-direction: row;
-  margin-top: 2rem;
-  margin-bottom: 2rem;
+  margin-top: 1.5rem;
 }
 
 #contenedorAdmin input{
   height: 15px;
   width: 15px;
-  margin-top: 15px;
+  margin-top: 10px;
 }
 
 #contenedorAdmin label{
-  margin-top: 15px;
+  margin-top: 10px;
 }
+
+.errorMessage{
+  width: 100%;
+  padding: 10px;
+  background-color: rgba(255, 0, 0, 0.66);
+  box-shadow: rgba(0, 0, 0, 0.07) 0px 1px 2px, rgba(0, 0, 0, 0.07) 0px 2px 4px, rgba(0, 0, 0, 0.07) 0px 4px 8px, rgba(0, 0, 0, 0.07) 0px 8px 16px, rgba(0, 0, 0, 0.07) 0px 16px 32px, rgba(0, 0, 0, 0.07) 0px 32px 64px;    color: black;
+  transition: 1s;
+  text-align: center;
+  position: relative;
+  top: 10pt;
+  border-radius: 5px;
+  margin-bottom: 1rem;
+}
+
+.hidden{
+  opacity: 0;
+  transition: 1s;
+  pointer-events: none;
+  margin-bottom: 10px;
+}
+
 
 input[type=submit]{
   max-width: 100pt;
@@ -397,23 +418,28 @@ input[type="submit"]:active{
 }
 
 /*Reglas para la visualización de la plantilla editar datos de usuario*/
+
+
+
 .userData{
   display: grid;
-  grid-template-columns: auto auto auto auto auto;
-  grid-template-rows: 2rem;
+  grid-template-columns: 2rem 15rem 8rem 4rem;
+  grid-template-rows: 2rem auto;
   text-align: center;
+  align-items: center;
   column-gap: 6px;
-}
-
-.userData{
   border-bottom: 1px solid black;
 }
-
+#operatorTasks{
+  margin-left: 1rem;
+  grid-column: 1 / -1;
+  justify-self: start;
+}
 .userData:last-child{
   border: none;
 }
 
-.userData input, .userData p{
+.userData h3, .userData p{
   height: 1.5rem;
 }
 .userData label{
@@ -459,6 +485,42 @@ input[type="submit"]:active{
   background-color: rgb(247, 212, 212);
   color: red;
   text-decoration: underline red 1px;
+}
+
+#editAlternatives{
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+#userTask{
+  display: flex;
+  direction: row;
+}
+
+.tareasEnLinea {
+  margin-top: 10px;
+  padding: 10px;
+  width: 28rem;
+  height: 2.5rem;
+  max-width: 28rem;
+  border: 1px solid black;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+  white-space: nowrap;
+  overflow-x: scroll;
+}
+
+.tareasEnLinea div {
+  white-space: nowrap; 
+}
+
+.tareasEnLinea div:hover {
+  transition: .5s;
+  color: #0d6efd;
+  cursor: default;
 }
 
 /*Reglas de visualización para la plantilla de edición*/
@@ -626,8 +688,30 @@ input[type="submit"]:active{
 
 #quantitySelector{
   text-align: center;
+  outline: none;
+  border: none;
+  border: 1px solid transparent;
+  border-radius: 5pt;
+  background: inherit;
+  color: #0d6efd;
+  padding: 1rem;
 }
+
+#quantitySelector:hover{
+  border-radius: 5pt;
+  border: 1px solid ;
+  transition: .3s;
+  text-decoration: none;
+}
+
+#quantitySelector:active{
+  background-color: #024cbd;
+  color: #FFFFFF;
+  transition: .3s;
+}
+
 /*reglas de estiolo para nuevo proyecto sin plantilla*/
+
 
 #proyectNameInput{
   display: flex;

@@ -1,7 +1,6 @@
 import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject, LOCALE_ID, ɵChangeDetectionSchedulerImpl, AfterViewInit, OnDestroy } from '@angular/core';
 import { gantt, MarkerConfig } from 'dhtmlx-gantt';
 import { dbDAO } from '../dbDAO';
-import { DataBaseRawData } from '../data-base-raw-data';
 import { ActivatedRoute, Router} from '@angular/router';
 import { CPMTask } from '../cpmtask';
 import { Task } from '../DTO/task';
@@ -20,7 +19,9 @@ export function parseTemplateTasksToGanttTasks(task: TareaPlantilla[], proyectSt
         id: task.id,  
         text: task.text, 
         duration: task.duration, 
-        start_date: format(addHours(proyectStart, task.start_date).toString(), "yyyy-MM-dd HH:mm") } as Task;
+        start_date: format(addHours(proyectStart, task.start_date).toString(), "yyyy-MM-dd HH:mm"),
+        users: [],
+        user_count: task.user_count } as Task;
 
     });
     return templateTasks;
@@ -35,7 +36,7 @@ export function parseTemplateTasksToGanttTasks(task: TareaPlantilla[], proyectSt
       <div>
         <input type="button" [value]="saveButtonName" id="submit" (click)="uploadChanges()">
         <input type="button" value="Volver sin Guardar" id="return" (click)="returnToCalendar()">
-        <input type="button" value="Actualizar Camino Critico" id="CPM" (click)="calculateCriticalPath()">
+        <!--<input type="button" value="Actualizar Camino Critico" id="CPM" (click)="calculateCriticalPath()">-->
       </div>
     </div>
     <div #ganttContainer class="scheduleWindow"></div>
@@ -49,7 +50,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
 
   tasksService: dbDAO = inject(dbDAO);
-  tasksList: DataBaseRawData[] = [];
+  private data: Task[] = [];
   private cpmTasks: CPMTask[] = [];
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -82,7 +83,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
           this.nameContent = element.title;
         }
           this.timerID = window.setInterval(()=>{
-          this.calculateCriticalPath();
+          this.calculateCriticalPath(gantt.config.start_date as Date);
         }, 350);   
       }
   }
@@ -102,6 +103,11 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
   private async initiateGanttForEditTemplate(){
     
+    gantt.attachEvent('onTaskCreated',(task: any) => {
+      task.user_count = 1;
+      return true;
+    });
+
     gantt.i18n.setLocale('es');
 
     gantt.config.date_format = '%Y-%m-%d %H:%i';
@@ -140,7 +146,18 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
         autofix_end: true,
         
       },
-      { name: 'Descripción', type: 'textarea', map_to: 'details', height: 50 }
+      {
+        name: 'Operarios necesarios',
+        type: 'select',
+        map_to: 'user_count',
+        options: [
+          { key: 1, label: '1' },
+          { key: 2, label: '2' },
+          { key: 3, label: '3' }
+        ],
+        default_value: 1
+      }
+  
     ];
 
     gantt.init(this.ganttContainer.nativeElement);
@@ -158,7 +175,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
     gantt.parse({data,links});
 
-    this.calculateCriticalPath();
+    this.calculateCriticalPath(gantt.config.start_date as Date);
 
   }
 
@@ -172,24 +189,56 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     }
   }
 
-  private async configWorkTime(){
-    let timeConfig = await this.tasksService.GetCalendarConfig().then((config: CalendarConfig)=>{
-      return {entrada: config.entrada, salida: config.salida, festivos: config.festivos};
-    });
-  
-    console.log(timeConfig);
-
+  private getSectionByName(name: string): HTMLElement | null {
+  const labels = document.querySelectorAll(".gantt_section_name");
+  for (const label of labels) {
+    if (label.textContent?.trim() === name) {
+      return label.parentElement as HTMLElement;
+    }
   }
-
+  return null;
+}
 
   private async initateGanttForViewProyect(){    
+   
+
+    gantt.attachEvent('onLightbox', taskId => {
+      const task = gantt.getTask(taskId);
+      const userCount = task["users"].length;
+      console.log(userCount);
+      const section = gantt.getLightboxSection(`Operario 1`);
+      const foundLabels = Array.from(section.node.parentElement?.querySelectorAll("label") || []) as HTMLLabelElement[];
+      const operarioLabels = foundLabels.filter((value: HTMLLabelElement)=>{
+        if(value.innerText.includes('Operario')){
+          return value;
+        }else{
+          return null
+        }
+      });
+      
+  
+      console.log(operarioLabels);
+      let taskCounter = 0;
+      for (let i = 0; i < operarioLabels.length; i++) {  
+        
+        if(taskCounter < userCount){
+          operarioLabels[i].innerText += `: ${task["users"][i].uname}`
+        }else{
+          operarioLabels[i].style.display = "none";
+        }
+        taskCounter++;
+
+      }
+      return true;
+    });
+    
     let element!: any;
 
 
-      element = await this.tasksService.GetProyect(this.id).then((proyect: Proyect | any) =>{
+    element = await this.tasksService.GetProyect(this.id).then((proyect: Proyect | any) =>{
         
-        return {id: proyect[0].id, start: proyect[0].start, end: proyect[0].end, title: proyect[0].title, color: proyect[0].color} as Proyect;
-      });
+      return {id: proyect[0].id, start: proyect[0].start, end: proyect[0].end, title: proyect[0].title, color: proyect[0].color} as Proyect;
+    });
 
 
 
@@ -234,21 +283,25 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
         type: 'duration',
         map_to: 'auto',
         time_format: ['%d', '%m', '%Y', '%H:%i'],
-        year_range: [gantt.config.start_date.getFullYear()-1, gantt.config.start_date.getFullYear()+2],
+        year_range: [gantt.config.start_date.getFullYear() - 1, gantt.config.start_date.getFullYear()+2],
         height: 72,
         autofix_end: true
       },
-      { name: 'Descripción', type: 'textarea', map_to: 'details', height: 50 }
+      { name: 'Observaciones', type: 'textarea', map_to: 'details', height: 100 },
+      { name: 'Operario 1', type: 'template', map_to: 'usuario_1' },
+      { name: 'Operario 2', type: 'template', map_to: 'usuario_2' },
+      { name: 'Operario 3', type: 'template', map_to: 'usuario_3' }
     ];
 
     gantt.init(this.ganttContainer.nativeElement);
 
       this.GetTasksAndLinks(this.id).then(({ TaskList, LinkList }: { TaskList: Task[]; LinkList: Link[] }) => {
        
+        this.data = TaskList;
         let data = TaskList;
         let links = LinkList;
         gantt.parse({data, links});
-        this.calculateCriticalPath();
+        this.calculateCriticalPath(gantt.config.start_date as Date);
       });
 
 
@@ -345,7 +398,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
               const {startDate, hours} = this.proyectSpan();
               return {id: plantilla[0].id, title: name, end: hours};
             });
-            const tareas: TareaPlantilla[] = this.parseTemplateTasks(template);
+            const tareas: TareaPlantilla[] = this.parseToTemplateTasks(template);
             //console.log(tareas);
             const enlaces: LinkPlantilla[] = this.parseTemplateLinks(template);
             //console.log(enlaces)
@@ -386,18 +439,20 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     return templateLinks;
   }
 
-  public parseTemplateTasks(template: Plantilla): TareaPlantilla[]{
+  public parseToTemplateTasks(template: Plantilla): TareaPlantilla[]{
 
     let templateTasks:  TareaPlantilla[] = [];
 
     gantt.eachTask((task)=>{
+      console.log(task.user_count);
       let templateTask: TareaPlantilla;
       templateTask= {
         tid: template.id,
         id: task.id,
         text: task.text,
         duration: task.duration,
-        start_date: ((task.start_date as Date).getTime() - gantt.config.start_date!.getTime())/3600000
+        start_date: ((task.start_date as Date).getTime() - gantt.config.start_date!.getTime())/3600000,
+        user_count: parseInt(task.user_count)
       }
       templateTasks.push(templateTask);
     })
@@ -412,68 +467,68 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
   
   }
 
- public calculateCriticalPath(): void {
+    public calculateCriticalPath(baseStartDate: Date): void {
 
-  const unitMs = 60 * 1000;
+    //console.log(baseStartDate);
+    const unitMs = 60 * 1000;
 
-  const graph: Record<number, CPMTask> = {};
-  gantt.eachTask((t: any) => {
-    graph[t.id] = {
-      id:    t.id,
-      start: t.start_date.getTime(),
-      dur:   t.duration,
-      preds: [],
-      succs: []
+    const graph: Record<number, CPMTask> = {};
+    gantt.eachTask((t: any) => {
+      graph[t.id] = {
+        id:    t.id,
+        start: t.start_date.getTime(),
+        dur:   t.duration,
+        preds: [],
+        succs: []
+      };
+    });
+
+    gantt.getLinks().forEach((link: any) => {
+      if (link.type === '0') { // FS
+        graph[link.source].succs.push(link.target);
+        graph[link.target].preds.push(link.source);
+      }
+    });
+
+    // 3) orden topológico (DFS)
+    const sorted: number[] = [];
+    const seen: Record<number, boolean> = {};
+    const dfs = (id: number) => {
+      if (seen[id]) return;
+      seen[id] = true;
+      graph[id].preds.forEach(pid => dfs(pid));
+      sorted.push(id);
     };
-  });
-  gantt.getLinks().forEach((link: any) => {
-  if (link.type === '0') {            // FS
-    graph[link.source].succs.push(link.target);
-    graph[link.target].preds.push(link.source);
-  }
-});
+    Object.keys(graph).map(k => +k).forEach(dfs);
 
-  // 3) orden topológico (DFS)
-  const sorted: number[] = [];
-  const seen: Record<number, boolean> = {};
-  const dfs = (id: number) => {
-    if (seen[id]) return;
-    seen[id] = true;
-    graph[id].preds.forEach(pid => dfs(pid));
-    sorted.push(id);
-  };
-  Object.keys(graph).map(k => +k).forEach(dfs);
+    // 4) pasada forward: ES/EF
+    sorted.forEach(id => {
+      const node = graph[id];
+      node.ES = node.preds.length === 0
+        ? (node.start - baseStartDate.getTime()) / unitMs  // aquí se ajusta la lógica
+        : Math.max(...node.preds.map(pid => graph[pid].EF!));
+      node.EF = node.ES + node.dur;
+    });
 
-  // 4) pasada forward: ES/EF
-  sorted.forEach(id => {
-    const node = graph[id];
-    node.ES = node.preds.length === 0
-      ? node.start
-      : Math.max(...node.preds.map(pid => graph[pid].EF!));
-    node.EF = node.ES + node.dur;
-  });
+    // 5) pasada backward: LS/LF y slack
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      const id = sorted[i];
+      const node = graph[id];
+      node.LF = node.succs.length === 0
+        ? node.EF!
+        : Math.min(...node.succs.map(sid => graph[sid].LS!));
+      node.LS = node.LF - node.dur;
+      node.slack = node.LS - node.ES!;
+    }
 
-  // 5) pasada backward: LS/LF y slack
-  for (let i = sorted.length - 1; i >= 0; i--) {
-    const id = sorted[i];
-    const node = graph[id];
-    node.LF = node.succs.length === 0
-      ? node.EF!
-      : Math.min(...node.succs.map(sid => graph[sid].LS!));
-    node.LS = node.LF - node.dur;
-    node.slack = node.LS - node.ES!;
-  }
+    this.cpmTasks = sorted.map(id => graph[id]);
 
-  this.cpmTasks = sorted.map(id => graph[id]);
-
-  // 6) colorear tareas críticas (slack === 0)
-  sorted.forEach(id => {
-    const task = gantt.getTask(id);
-    task.color = (graph[id].slack === 0) ? '#d9534f' : '';
-    gantt.updateTask(id);
-    gantt
-  });
-
+    // 6) colorear tareas críticas (slack === 0)
+    sorted.forEach(id => {
+      const task = gantt.getTask(id);
+      task.color = (graph[id].slack === 0) ? '#d9534f' : '';
+      gantt.updateTask(id);
+    });
   }
 
   private proyectSpan():{startDate: Date, hours: number}{

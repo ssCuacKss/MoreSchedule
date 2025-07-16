@@ -1,5 +1,11 @@
 export interface User {
     uname: string,
     pass: string,
-    admin: Boolean
+    admin: boolean,
+    disponible: boolean,
+    tareas?: {
+        tarea: string,
+        acaba: string,
+        pid: number
+    }[]
 }
