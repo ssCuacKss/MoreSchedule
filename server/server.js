@@ -247,17 +247,22 @@ async function main() {
         }
 
         for (const t of tasks) {
+            //console.log(t);
             t.pid = parseInt(t.pid);
             if (
                 typeof t.pid !== 'number' ||
                 typeof t.id  !== 'number' ||
                 typeof t.text!== 'string' ||
                 typeof t.start_date !== 'string' ||
-                typeof t.duration   !== 'number' ||
+                typeof t.duration   !== 'number' || 
+                typeof t.details !== 'string' || 
+                typeof t.slack !== 'number' ||
+                typeof t.offtime !== 'number' ||
+                typeof t.progress !== 'number' ||
                 !Array.isArray(t.users)
             ) {
             return res.status(400).json({
-                error: 'Cada tarea debe tener pid(number), id(number), text(string), start_date(string), duration(number)'
+                error: 'Cada tarea debe tener pid(number), id(number), text(string), start_date(string), duration(number), details(string), offtime(number)'
             });
             }
         }
@@ -269,6 +274,10 @@ async function main() {
                 text: t.text,
                 start_date: t.start_date,
                 duration:   t.duration,
+                details: t.details ?? "",
+                offtime: t.offtime,
+                slack: t.slack,
+                progress: t.progress,
                 users: t.users
             }));
             const result = await db.collection('tasks').insertMany(toInsert);

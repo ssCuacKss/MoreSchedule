@@ -118,6 +118,10 @@ export class dbDAO {
           text: task.text,
           start_date: task.start_date,
           duration: task.duration,
+          offtime: task.offtime,
+          details: task.details,
+          slack: task.slack,
+          progress: task.progress,
           users: task.users ?? []
         }
       )
@@ -145,26 +149,25 @@ export class dbDAO {
     return parsedLinks ?? [];
   }
 
-  public async SaveProyectTasksandLinks(
-    pid: number,
-    tasks: any[],
-    rels:  any[]
-  ): Promise<void> {
-  const cleanTasks = tasks;
-  // si tus links no tienen esas props, puedes omitir este paso para ellos
-  const cleanRels  = rels; 
+  public async SaveProyectTasksandLinks(pid: number, tasks: any[], rels:  any[]): Promise<void> {
+    const cleanTasks = tasks;
+  
+    const cleanRels  = rels; 
 
-  // 1) Añadir pid a cada tarea y a cada enlace
-  const tasksWithPid: Task[] = cleanTasks.map(t => ({ ...t, pid }));
-  const linksWithPid:  Link[] = cleanRels.map(l => ({ ...l, pid }));
+    //console.log("tareas antes de procesarlas: ", tasks);
+    
+    const tasksWithPid: Task[] = cleanTasks.map(t => ({ ...t, pid }));
+    const linksWithPid:  Link[] = cleanRels.map(l => ({ ...l, pid }));
 
-  // 2) Ejecutar ambos batch en paralelo y esperar resultados
-  if(tasksWithPid.length !== 0){
-    const taskRes = await lastValueFrom(this.createTasksBatch(tasksWithPid));
-  }
-  if(linksWithPid.length !== 0){
-    const LinkRes = await lastValueFrom(this.createLinksBatch(linksWithPid));
-  }
+    //console.log("tareas despues de procesarlas: ", tasksWithPid);
+
+    // 2) Ejecutar ambos batch en paralelo y esperar resultados
+    if(tasksWithPid.length !== 0){
+      const taskRes = await lastValueFrom(this.createTasksBatch(tasksWithPid));
+    }
+    if(linksWithPid.length !== 0){
+      const LinkRes = await lastValueFrom(this.createLinksBatch(linksWithPid));
+    }
 
 
   }

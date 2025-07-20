@@ -1,9 +1,9 @@
 import { Component, ElementRef, inject, LOCALE_ID, OnInit, ViewChild } from '@angular/core';
 import { CalendarDateFormatter, CalendarEvent, CalendarModule, CalendarMonthViewDay } from 'angular-calendar';
 import { SchedulerDateFormatter, SchedulerModule } from 'angular-calendar-scheduler';
-import { startOfDay, addHours, addMonths, subMonths, isSameMonth, isSameDay, format, add, addMinutes} from 'date-fns';
+import { startOfDay, addHours, addMonths, subMonths, isSameMonth, isSameDay, format, add, addMinutes, addDays, isSaturday, isSunday} from 'date-fns';
 import { Router } from '@angular/router';
-import { CommonModule, registerLocaleData } from '@angular/common';
+import { CommonModule, formatNumber, registerLocaleData } from '@angular/common';
 import localeEs from '@angular/common/locales/es';
 import { DOCUMENT } from '@angular/common';
 import { ReactiveFormsModule} from '@angular/forms';
@@ -14,7 +14,6 @@ import { Proyect } from '../DTO/proyect';
 import { Plantilla } from '../DTO/plantilla';
 import { TareaPlantilla } from '../DTO/tarea-plantilla';
 import { LinkPlantilla } from '../DTO/link-plantilla';
-import { parseTemplateTasksToGanttTasks } from '../schedule-chart/schedule-chart.component';
 import { Task } from '../DTO/task';
 import { Link } from '../DTO/link';
 import { User } from '../DTO/user';
@@ -100,7 +99,7 @@ import { User } from '../DTO/user';
         </div>
       <ng-template #calendarConfig>
         <h3>Horas de trabajo</h3>
-          <div class="workHours">ElegirPlantilla(plantilla)
+          <div class="workHours">
             <p>Entrada</p>
             <p></p>
             <p>Salida</p>
@@ -108,7 +107,7 @@ import { User } from '../DTO/user';
             <p>Hasta</p>
             <input type="time" [value]="calendarConfigData.salida" #salida>
           </div>
-          <div class="festivos">
+          <!--<div class="festivos">
             <h3>Dias festivos</h3>
             <div class="dates">
               <input type="date" #fecha1>
@@ -127,10 +126,10 @@ import { User } from '../DTO/user';
                   <input type="button" value="eliminar" [id]="i" (click)="eraseDate($event)">
               </div>
             </div>
-            <div id="saveChangesButtonDiv">
+          </div>-->
+          <div id="saveChangesButtonDiv">
             <input type="button" value="Guardar cambios" id="saveCalendarConfig" #saveCalendarConfig (click)="saveConfig()">
             </div>
-          </div>
       </ng-template>
 
       <ng-template #createUser>
@@ -169,7 +168,7 @@ import { User } from '../DTO/user';
             <div id="operatorTasks" *ngIf="(user.disponible && user.tareas !== undefined && user.tareas !== null && user.tareas.length !== 0)">
             <div class="tareasEnLinea">
               <div *ngFor="let tarea of user.tareas; index as j">
-                [Tarea: {{tarea.tarea}} - termina: {{tarea.acaba}}]
+                <span>[Tarea: {{tarea.tarea}} - termina: {{tarea.acaba}}]</span>
               </div>
             </div>
             </div>
@@ -301,7 +300,7 @@ export class ScheduleCalendarComponent implements OnInit{
 
       this.users = await this.proyects.GetUsers().then((users: User[])=>{return users})
       this.usuariosFront = this.users.map(user => ({ ...user }));
-      console.log(this.usuariosFront);
+      //console.log(this.usuariosFront);
     }
 
   async downloadEvents(){
@@ -648,7 +647,7 @@ lightenColor(hex: string, percent: number): string {
     let asignable:boolean = false;
 
     while(!asignable){
-      const parsedTasks: Task[] = parseTemplateTasksToGanttTasks(tareasPlantilla, bestStartDate);
+      const parsedTasks: Task[] = this.parseTemplateTasksToGanttTasks(tareasPlantilla,parsedLinks ,bestStartDate);
       const span = this.proyectSpan(parsedTasks);
       
       const ProyectToSave: Proyect = {
@@ -676,37 +675,10 @@ lightenColor(hex: string, percent: number): string {
        }
     }
 
-    //console.log("startdate final", bestStartDate);
-
-    //console.log(bestStartDate,format(bestStartDate, "yyyy-MM-dd HH:mm"));
 
     fecha.value = format(bestStartDate, "yyyy-MM-dd HH:mm");
 
-    /*let events = [...this.events];
-    if(clicked){
-        events.forEach((e: CalendarEvent) => {
-        if((e.end ?? "") < currentDate){
-          events.splice(events.indexOf(e),1);
-        }
-      });
 
-      if(events.length === 0){
-
-        let splittedDate = addHours(currentDate,2).toISOString().split(":");
-        fecha.value = splittedDate[0]+":"+splittedDate[1];
-      }else{
-        let currentHighestEndDate = events[0].end;
-        events.forEach((e: CalendarEvent) =>{
-          if((currentHighestEndDate ?? "") < (e.end ?? "")){
-            currentHighestEndDate = e.end;
-          }
-        });
-        let splittedDate = addHours((currentHighestEndDate ?? new Date), 2).toISOString().split(":");
-        fecha.value = splittedDate[0]+":"+splittedDate[1];
-      }
-    }else{
-      fecha.value = "";
-    }*/
   }
 
   public async iniciarProyecto(){
@@ -746,6 +718,46 @@ lightenColor(hex: string, percent: number): string {
   }
 
   async eraseProyect(event: CalendarEvent){
+
+
+    //console.log(this.usuariosFront);
+    const proyectId: number = event.id as number;
+    //console.log("revisando los usuarios");
+    const updatedUsers: User[] = this.usuariosFront.map(user => ({
+    ...user,
+    tareas: user.tareas ? user.tareas.map(t => ({ ...t })) : []
+  }));
+    updatedUsers.forEach((user: User)=>{
+      //console.log("revisando al usuario: "+ user.uname);
+      if(user.tareas !== undefined && user.tareas !== null && user.tareas.length !== 0){
+        //console.log("el usuario tiene: ", user.tareas.length, " tareas");
+        let indexesToErase: number[] = []
+        user.tareas.forEach(tarea =>{ 
+          //console.log("comprobando tarea: ",tarea.tarea, "comparando ids (proyect vs asigned): ", proyectId, tarea.pid );
+          if(tarea.pid === proyectId){
+            //console.log("los codigos son iguales");
+            let taskIndex = user.tareas?.indexOf(tarea);
+            indexesToErase.push(taskIndex as number);
+            //user.tareas?.splice(taskIndex as number, 1);
+          }
+        });
+        indexesToErase.forEach((index: number)=>{
+          user.tareas?.splice(index);
+        });
+        indexesToErase = [];
+      }
+    });
+    //console.log(updatedUsers);
+    //console.log(this.usuariosFront);
+
+    this.usuariosFront = updatedUsers;
+
+    this.actualizarUsuarios();
+
+    this.users = this.usuariosFront.map(user => ({
+      ...user,
+      tareas: user.tareas ? user.tareas.map(t => ({ ...t })) : []
+    }));
 
     const indexOfEvent = this.events.indexOf(event);
     this.events.splice(indexOfEvent, 1);
@@ -790,6 +802,7 @@ lightenColor(hex: string, percent: number): string {
 
   public async parsearPlantilla() {
   const date = (this.dateStartNPCP.nativeElement as HTMLInputElement).value;
+  
 
   const updatedUsers: User[] = this.users.map(user => ({
     ...user,
@@ -798,7 +811,7 @@ lightenColor(hex: string, percent: number): string {
 
   if (date !== "" || this.plantillaElegida !== undefined) {
     const tareasPlantilla: TareaPlantilla[] = await this.proyects.GetTemplateTasks(this.plantillaElegida!.id);
-    const parsedTasks: Task[] = parseTemplateTasksToGanttTasks(tareasPlantilla, new Date(date));
+    
     const linksPlantilla: LinkPlantilla[] = await this.proyects.GetTemplateLinks(this.plantillaElegida!.id);
     
     const parsedLinks = linksPlantilla.map((link: LinkPlantilla) => ({
@@ -807,7 +820,8 @@ lightenColor(hex: string, percent: number): string {
       target: link.target,
       type: link.type
     } as Link));
-
+    const parsedTasks: Task[] = this.parseTemplateTasksToGanttTasks(tareasPlantilla, parsedLinks,new Date(date));
+    
     const span = this.proyectSpan(parsedTasks);
     const newColor = this.getRandomHexColor();
 
@@ -838,9 +852,6 @@ lightenColor(hex: string, percent: number): string {
 
     const asignado = this.addUsersToTasks(updatedUsers, copiaTasks, ProyectToSave, copiaLinks, tareasPlantilla);
 
-    if (!asignado) {
-      return;
-    }
 
     // ✅ Asignamos la copia modificada para mostrar en UI
     this.usuariosFront = updatedUsers;
@@ -1069,9 +1080,7 @@ lightenColor(hex: string, percent: number): string {
 
   public actualizarUsuarios(){
   
-    const toCompare = this.users.length;
     //console.log(this.usuariosFront, this.users);
-
 
     const ammountToCompare = this.users.length;
 
@@ -1090,5 +1099,142 @@ lightenColor(hex: string, percent: number): string {
     //}
 
   }
+  private contarFinesDeSemana(inicio: Date, fin: Date): number {
+    let contador = 0;
+    let fecha = new Date(inicio);
+    fecha.setHours(0, 0, 0, 0);
+
+    while (fecha <= fin) {
+      const dia = fecha.getDay();
+      if (dia === 0 || dia === 6){
+        contador++;
+      } 
+      fecha = new Date(fecha.getTime() + 86400000);
+    }
+
+    return contador;
+  }
+
+
+
+private parseTemplateTasksToGanttTasks(tasks: TareaPlantilla[], links: Link[], proyectStart: Date): Task[] {
+
+  const horaEntrada = this.calendarConfigData.entrada;
+  const horaSalida = this.calendarConfigData.salida;
+  const [hora1, minuto1] = horaEntrada.split(':').map(Number);
+  const [hora2, minuto2] = horaSalida.split(':').map(Number);
+
+  const duracionJornada =  (hora2 - hora1) * 60 + (minuto2 - minuto1);
+  //console.log(duracionJornada)
+  //console.log(hora1, minuto1, hora2, minuto2);
+
+  const templateTasks = tasks.map((task) => {
+    
+   
+    return {
+      id: task.id,
+      text: task.text,
+      duration: task.duration,
+      offtime: 0,
+      start_date: format(proyectStart.getTime() + task.start_date * 3600000, "yyyy-MM-dd HH:mm"),
+      details: "",
+      slack: 0,
+      progress: 0,
+      users: []
+    };
+  });
+
+  let adaptedTasks: Task[] = [];
+
+  let parsedTasks = templateTasks.map((value: Task)=>({
+    ...value
+  }));
+
+  parsedTasks.sort((a: Task, b: Task) => {
+    return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
+  });
+
+  //console.log(parsedTasks, links);
+
+  parsedTasks.forEach((task: Task)=>{
+    let IncomingLinks = links.filter((link: Link) => link.target === task.id);
+    let startDates: Date[] = [];
+    if(adaptedTasks.length !== 0){
+      IncomingLinks.forEach((linkPredecesor: Link)=>{
+        let taskToAdd = adaptedTasks.find((PredecesorTask) => PredecesorTask.id === linkPredecesor.source );
+        if(taskToAdd !== undefined){
+          const endTime = new Date(taskToAdd.start_date).getTime() + taskToAdd.duration * 60000;
+          startDates.push(new Date(endTime));
+        }
+      });
+    }
+    
+    let taskAdjustedStartDate = task.start_date;
+
+    if (startDates.length !== 0) {
+      startDates.sort((a, b) => b.getTime() - a.getTime());
+      taskAdjustedStartDate = format(startDates[0], "yyyy-MM-dd HH:mm");
+    }
+    
+
+    //console.log(task.text, IncomingLinks, taskAdjustedStartDate);
+    let fechaInicioTarea = new Date(taskAdjustedStartDate);
+    const {horaInicioTarea, minutoInicioTarea} = {horaInicioTarea: fechaInicioTarea.getHours(), minutoInicioTarea: fechaInicioTarea.getMinutes()};
+    
+    if(horaInicioTarea < hora1 || ((horaInicioTarea === hora1 ) && (minutoInicioTarea < minuto1))){
+      fechaInicioTarea.setHours(hora1, minuto1);
+    }else if(horaInicioTarea > hora2 || ((horaInicioTarea === hora2 ) && (minutoInicioTarea >= minuto2))){
+      fechaInicioTarea.setHours(hora1, minuto1);
+      fechaInicioTarea = new Date(fechaInicioTarea.getTime() + 86400000);
+    }
+    while(isSaturday(fechaInicioTarea) || isSunday(fechaInicioTarea)){
+      fechaInicioTarea = new Date(fechaInicioTarea.getTime() + 86400000);
+    }
+
+    //task.start_date = format(fechaInicioTarea, "yyyy-MM-dd HH:mm");
+    //console.log(fechaInicioTarea);
+    
+    let fechaFinDirecto = new Date(fechaInicioTarea.getTime() + task.duration * 60000);
+    
+    let fullJournals = Math.floor((task.duration / duracionJornada));
+    //console.log(fullJournals, (task.duration / duracionJornada));
+    
+    let tiempoFinDeSemana = this.contarFinesDeSemana(fechaInicioTarea, fechaFinDirecto);
+    //console.log(tiempoFinDeSemana, fullJournals);
+    let tiempoFueraDeJornada = tiempoFinDeSemana + fullJournals;
+
+    let fechaFinConFinesDeSemana = new Date(fechaInicioTarea.getTime() + task.duration * 60000  + tiempoFueraDeJornada * 86400000 );
+    const horaFin = fechaFinConFinesDeSemana.getHours();
+    const minutosFin = fechaFinConFinesDeSemana.getMinutes();
+
+    let horasExtra = 0;
+    let minutosExtra = 0;
+
+    if(horaFin > hora2 || (horaFin === hora2 && (minutosFin > minuto2))){
+      fechaFinConFinesDeSemana.setHours(hora1, minuto1);
+      fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + 86400000);
+      ++tiempoFueraDeJornada;
+      horasExtra = horaFin - hora2;
+      minutosExtra = minutosFin - minuto2;
+    }
+    let timeToAdd = (horasExtra * 60 + minutosExtra) * 60000 ;
+    tiempoFueraDeJornada += ((horasExtra + minutosExtra / 60)/24);
+    fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + timeToAdd);
+    
+    while(isSaturday(fechaFinConFinesDeSemana) || isSunday(fechaFinConFinesDeSemana)){
+      fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + 86400000);
+      ++tiempoFueraDeJornada;
+    }
+    
+    const adaptedTask: Task = {id: task.id, text: task.text, start_date: format(fechaInicioTarea, "yyyy-MM-dd HH:mm"), duration: (fechaFinConFinesDeSemana.getTime() - fechaInicioTarea.getTime())/60000, offtime: tiempoFueraDeJornada * 1440, details: "", slack: 0, progress: 0 ,users: [] } 
+
+    adaptedTasks.push(adaptedTask);
+
+  });
+
+  console.log(adaptedTasks);
+
+  return adaptedTasks;
+}
 
 }

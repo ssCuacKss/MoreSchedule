@@ -10,22 +10,9 @@ import { addHours, format } from 'date-fns';
 import { Plantilla } from '../DTO/plantilla';
 import { TareaPlantilla } from '../DTO/tarea-plantilla';
 import { LinkPlantilla } from '../DTO/link-plantilla';
-import { CalendarConfig } from '../DTO/calendar-config';
+import { __values } from 'tslib';
 
-export function parseTemplateTasksToGanttTasks(task: TareaPlantilla[], proyectStart: Date): Task[]{
-    let templateTasks:  Task[] = [];
-    templateTasks = task.map((task)=>{
-      return {
-        id: task.id,  
-        text: task.text, 
-        duration: task.duration, 
-        start_date: format(addHours(proyectStart, task.start_date).toString(), "yyyy-MM-dd HH:mm"),
-        users: [],
-        user_count: task.user_count } as Task;
 
-    });
-    return templateTasks;
-  }
 
 @Component({
   selector: 'app-schedule-chart',
@@ -81,10 +68,11 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
             return {id: plantilla[0].id, title: plantilla[0].title, end: plantilla[0].end}
           });
           this.nameContent = element.title;
-        }
           this.timerID = window.setInterval(()=>{
           this.calculateCriticalPath(gantt.config.start_date as Date);
         }, 350);   
+        }
+          
       }
   }
 
@@ -169,7 +157,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       return tasks;
     });
 
-    let data = parseTemplateTasksToGanttTasks(tasks,gantt.config.start_date);
+    let data = this.parseTemplateTasksToGanttTasks(tasks,gantt.config.start_date);
     
     //console.log(data, links);
 
@@ -188,16 +176,26 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       return `${splitDate[2]}-${splitDate[0]}-${splitDate[1]} ${splitFullDate[1]}`
     }
   }
+  private  parseTemplateTasksToGanttTasks(tasks: TareaPlantilla[], proyectStart: Date): any[]{
+    let templateTasks:  Task[] = [];
 
-  private getSectionByName(name: string): HTMLElement | null {
-  const labels = document.querySelectorAll(".gantt_section_name");
-  for (const label of labels) {
-    if (label.textContent?.trim() === name) {
-      return label.parentElement as HTMLElement;
-    }
+
+    templateTasks = tasks.map((task)=>{
+
+      return {
+        id: task.id,  
+        text: task.text, 
+        duration: task.duration,
+        offtime: 0,
+        start_date: format(proyectStart.getTime() + task.start_date * 3600000, "yyyy-MM-dd HH:mm"),
+        details: "",
+        slack: 0,
+        progress: 0,
+        users: [],
+        user_count: task.user_count };
+    });
+    return templateTasks;
   }
-  return null;
-}
 
   private async initateGanttForViewProyect(){    
    
@@ -205,7 +203,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     gantt.attachEvent('onLightbox', taskId => {
       const task = gantt.getTask(taskId);
       const userCount = task["users"].length;
-      console.log(userCount);
+      //console.log(userCount);
       const section = gantt.getLightboxSection(`Operario 1`);
       const foundLabels = Array.from(section.node.parentElement?.querySelectorAll("label") || []) as HTMLLabelElement[];
       const operarioLabels = foundLabels.filter((value: HTMLLabelElement)=>{
@@ -217,13 +215,15 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       });
       
   
-      console.log(operarioLabels);
+      //console.log(operarioLabels);
       let taskCounter = 0;
       for (let i = 0; i < operarioLabels.length; i++) {  
         
-        if(taskCounter < userCount){
-          operarioLabels[i].innerText += `: ${task["users"][i].uname}`
-        }else{
+        if (taskCounter < userCount) {
+          operarioLabels[i].innerText = `Operario ${i + 1}: ${task["users"][i].uname}`;
+          operarioLabels[i].style.display = "";
+        } else {
+          operarioLabels[i].innerText = `Operario ${i + 1}:`;
           operarioLabels[i].style.display = "none";
         }
         taskCounter++;
@@ -295,15 +295,16 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
     gantt.init(this.ganttContainer.nativeElement);
 
-      this.GetTasksAndLinks(this.id).then(({ TaskList, LinkList }: { TaskList: Task[]; LinkList: Link[] }) => {
-       
-        this.data = TaskList;
-        let data = TaskList;
-        let links = LinkList;
-        gantt.parse({data, links});
-        this.calculateCriticalPath(gantt.config.start_date as Date);
-      });
+    await this.GetTasksAndLinks(this.id).then(({ TaskList, LinkList }: { TaskList: Task[]; LinkList: Link[] }) => {
+      
+      this.data = TaskList;
+      let data = TaskList;
+      let links = LinkList;
+      gantt.parse({data, links});
+      this.calculateCriticalPath(gantt.config.start_date as Date);
+    });
 
+    await this.uploadChanges();
 
   }
 
@@ -319,7 +320,6 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     return {TaskList: Tasks, LinkList: Links};
 
   }
-
 
 
   constructor() {
@@ -380,6 +380,12 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
           await this.tasksService.createProyect(element);
 
           await this.tasksService.deleteAllByPidPromise(this.id);
+          
+          //console.log("tareas que se envían al DAO",this.id, content.data, content.links);
+
+          /*content.data.forEach((values: any) => {
+            console.log(values['slack']);
+          });*/
 
           await this.tasksService.SaveProyectTasksandLinks(
             this.id,
@@ -444,7 +450,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     let templateTasks:  TareaPlantilla[] = [];
 
     gantt.eachTask((task)=>{
-      console.log(task.user_count);
+      //console.log(task.user_count);
       let templateTask: TareaPlantilla;
       templateTask= {
         tid: template.id,
@@ -467,7 +473,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
   
   }
 
-    public calculateCriticalPath(baseStartDate: Date): void {
+  public calculateCriticalPath(baseStartDate: Date): void {
 
     //console.log(baseStartDate);
     const unitMs = 60 * 1000;
@@ -527,6 +533,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     sorted.forEach(id => {
       const task = gantt.getTask(id);
       task.color = (graph[id].slack === 0) ? '#d9534f' : '';
+      task['slack'] = graph[id].slack;
       gantt.updateTask(id);
     });
   }
