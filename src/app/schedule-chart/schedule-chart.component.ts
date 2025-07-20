@@ -1,7 +1,7 @@
 import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject, LOCALE_ID, ɵChangeDetectionSchedulerImpl, AfterViewInit, OnDestroy } from '@angular/core';
 import { gantt, MarkerConfig } from 'dhtmlx-gantt';
 import { dbDAO } from '../dbDAO';
-import { ActivatedRoute, Router} from '@angular/router';
+import { ActivatedRoute, Route, Router} from '@angular/router';
 import { CPMTask } from '../cpmtask';
 import { Task } from '../DTO/task';
 import { Link } from '../DTO/link';
@@ -11,6 +11,7 @@ import { Plantilla } from '../DTO/plantilla';
 import { TareaPlantilla } from '../DTO/tarea-plantilla';
 import { LinkPlantilla } from '../DTO/link-plantilla';
 import { __values } from 'tslib';
+import { CookieService } from 'ngx-cookie-service';
 
 
 
@@ -39,8 +40,10 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
   tasksService: dbDAO = inject(dbDAO);
   private data: Task[] = [];
   private cpmTasks: CPMTask[] = [];
-  private route = inject(ActivatedRoute);
-  private router = inject(Router);
+  private route: ActivatedRoute = inject(ActivatedRoute);
+  private router: Router = inject(Router);
+  private cookie: CookieService = inject(CookieService)
+
   private id = this.route.snapshot.queryParams['id'];  
   private mode: string = this.route.snapshot.queryParams['title'];
   private timerID: number = 0;
@@ -323,6 +326,10 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
 
   constructor() {
+
+   if(this.cookie.get('LoginCookie').valueOf() !== 'ALLOWEDTOLOGIN'){
+      this.router.navigate(['/']);
+    }
 
     gantt.eachTask((t: any) => {
       gantt.deleteTask(t.id);

@@ -51,10 +51,9 @@ export class LogInScreenComponent {
   });
 
   constructor(){
-    if(this.cookie.get('Test').valueOf() === 'ALLOWEDTOLOGIN'){
-      //this.router.navigate(['/Calendar'])
+    if(this.cookie.get('LoginCookie').valueOf() === 'ALLOWEDTOLOGIN'){
+      this.router.navigate(['/Calendar'])
     }
-    //this.user.createUser({uname: "pancracio", pass: "Pancracio12345cul", admin: false});
   }
 
   public updateAreaType(event: Event){
@@ -69,14 +68,15 @@ export class LogInScreenComponent {
 
     public async submitInfo(): Promise<void>{
 
-    //this.cookie.set('Test', 'ALLOWEDTOLOGIN', 1);
+    this.cookie.set('LoginCookie', 'ALLOWEDTOLOGIN', 1);
     let error = (this.errorMessage.nativeElement) as HTMLParagraphElement;
     if(this.regex[1].test(this.loginInfo.value.userName) && this.regex[0].test(this.loginInfo.value.passWord)){
       let valid =  await this.user.GetUser(this.loginInfo.value.userName, this.loginInfo.value.passWord);
+      
       error.className = "hidden";
       if(valid){
         error.className = "hidden";
-        this.redirectToPage(valid);
+        this.redirectToPage(valid.user);
       }else{
         error.innerHTML = "El usuario no existe";
         error.className = "errorMessage";
@@ -86,7 +86,6 @@ export class LogInScreenComponent {
       error.className = "errorMessage";
     }
 
-    //this.router.navigate(['/Calendar'])
   }
 
 

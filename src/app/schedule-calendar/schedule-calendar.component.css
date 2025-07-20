@@ -26,30 +26,62 @@
 
 }
 
-.removeProyect{
-  background: transparent;
-  margin-left: 10px;
-  outline: none;
-  border: 2px solid white;
-  text-align: center;
-  border-radius: 100%;
-  color: whitesmoke;
-  font-weight: 900;
-  font-size: large;
-  transition: 0.3s;
+
+.removeProyectButton{
+  display: none;
 }
 
-.removeProyect:hover{
-  background: red;
-  rotate: 360deg;
+#removeProyectHolder{
+  position: relative;
+  top: 5px
+}
+
+#removeProyectImg{
+  max-width: 1.5rem;
+  max-height: 1.5rem;
+  filter: invert(1);
+  transition: 0.2s;
+}
+
+#removeProyectImg:hover{
   
+  filter: invert(48%) sepia(13%) saturate(3207%) hue-rotate(310deg) brightness(100%) contrast(100%);
+}
+
+#removeProyectImg:active{
+  
+  filter: invert(48%) sepia(13%) saturate(3207%) hue-rotate(310deg) brightness(100%) contrast(70%);
+}
+
+
+
+#viewProyectSummaryButton{
+  display: none;
+}
+
+
+#viewSummaryHolder{
+  margin-left: 10px;
+  position: relative;
+  top: 5px
 
 }
 
-.removeProyect:active{
-  background: darkred;
-
+#viewProyectSummaryImg{
+  max-width: 1.5rem;
+  max-height: 1.5rem;
+  filter: invert(1);
+  transition: 0.2s;
 }
+
+#viewProyectSummaryImg:hover{
+  filter: invert(0.7);
+}
+
+#viewProyectSummaryImg:active{
+  filter: invert(0.6);
+}
+
 
 #prevMonth {
   border-top-left-radius: 30px;

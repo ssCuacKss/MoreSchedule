@@ -1,7 +1,7 @@
 import { Component, ElementRef, inject, LOCALE_ID, OnInit, ViewChild } from '@angular/core';
 import { CalendarDateFormatter, CalendarEvent, CalendarModule, CalendarMonthViewDay } from 'angular-calendar';
 import { SchedulerDateFormatter, SchedulerModule } from 'angular-calendar-scheduler';
-import { startOfDay, addHours, addMonths, subMonths, isSameMonth, isSameDay, format, add, addMinutes, addDays, isSaturday, isSunday} from 'date-fns';
+import { startOfDay, addHours, addMonths, subMonths, isSameMonth, isSameDay, format, add, addMinutes, isSaturday, isSunday} from 'date-fns';
 import { Router } from '@angular/router';
 import { CommonModule, formatNumber, registerLocaleData } from '@angular/common';
 import localeEs from '@angular/common/locales/es';
@@ -17,6 +17,7 @@ import { LinkPlantilla } from '../DTO/link-plantilla';
 import { Task } from '../DTO/task';
 import { Link } from '../DTO/link';
 import { User } from '../DTO/user';
+import { CookieService } from 'ngx-cookie-service';
 
 
 
@@ -96,7 +97,13 @@ import { User } from '../DTO/user';
           <div *ngSwitchCase="'NuevoProyectoSP'">
             <ng-container *ngTemplateOutlet="newProyectNP"/>
           </div>
+          <div *ngSwitchCase="'ViewSummary'">
+            <ng-container *ngTemplateOutlet="viewSummary"/>
+          </div>
         </div>
+        <ng-template #viewSummary>
+
+        </ng-template>
       <ng-template #calendarConfig>
         <h3>Horas de trabajo</h3>
           <div class="workHours">
@@ -198,7 +205,7 @@ import { User } from '../DTO/user';
               </div>
         </div>
         <div class="dateStartSelector">
-          <input type="checkbox" #checkAuto id="autoDate" (click)="autoClicked($event)">
+          <input type="checkbox" #checkAuto id="autoDate" (click)="autoClicked()">
           <label for="autoDate">selección de fecha automática</label>
           <input type="datetime-local" #NPDateStart>
         </div>
@@ -215,7 +222,7 @@ import { User } from '../DTO/user';
               <input type="text" #textInputProyectName id="inputName" #NPSPName>
         </div>
         <div class="dateStartSelector">
-          <input type="checkbox" id="autoDate" (click)="autoClicked($event)">
+          <input type="checkbox" id="autoDate" (click)="autoClicked()">
           <label for="autoDate">selección de fecha automática</label>
           <input type="datetime-local" #NPSPDateStart>
         </div>
@@ -225,10 +232,21 @@ import { User } from '../DTO/user';
       </ng-template>
 
       <ng-template #eventActionsTpl let-event="event" >
-        <button class="removeProyect" mwlCalendarAction="delete" (click)="eraseProyect(event)">
-          X
-        </button>
+        <span id="eventActions">
+          <button class="removeProyectButton" id="removeProyect" mwlCalendarAction="delete">
+            X
+          </button>
+          <label id="removeProyectHolder" for="removeProyectImg">
+            <img id="removeProyectImg" src="https://external-content.duckduckgo.com/iu/?u=http%3A%2F%2Fpluspng.com%2Fimg-png%2Fdelete-button-png-delete-icon-1600.png&f=1&nofb=1&ipt=4dabcc6436bdc1eb053d319c244bb71bc1f21238a165543478c5f69b8d1e7a6f" alt="delete button" (click)="eraseProyect(event)">
+          </label>
+          <button  id="viewProyectSummaryButton">
+          </button>
+          <label id="viewSummaryHolder">
+            <img src="https://icon-library.com/images/list-icon-png/list-icon-png-0.jpg" id=viewProyectSummaryImg alt="listIconSummary" width="500" height="600" (click)="selectOption('ViewSummary')">
+          </label>
+        </span>
       </ng-template>
+
     
   `,
   styleUrl: './schedule-calendar.component.css',
@@ -249,6 +267,7 @@ export class ScheduleCalendarComponent implements OnInit{
   public activeDayIsOpen: boolean = false;
   private document: Document = inject(DOCUMENT);
   private router: Router = inject(Router);
+  private cookie: CookieService = inject(CookieService);
   private lock: boolean = false;
   public configOption: string = "";
   private proyects: dbDAO = inject(dbDAO);
@@ -270,9 +289,8 @@ export class ScheduleCalendarComponent implements OnInit{
   @ViewChild('NPSPName') private entradaNPSP!: ElementRef;
   @ViewChild('NPSPDateStart') private dateStartNPSP!: ElementRef;
   @ViewChild('NPDateStart') private dateStartNPCP!: ElementRef;
-  @ViewChild('proyectAddFromTemplate') private proyectQuantity!: ElementRef;
   @ViewChild('errorMessage') private errorMessage!: ElementRef;
-
+  @ViewChild('checkAuto') private checkAuto!: ElementRef;
 
   public crearUsuario: FormGroup =  new FormGroup({
     nombre: new FormControl(''),
@@ -284,7 +302,9 @@ export class ScheduleCalendarComponent implements OnInit{
 
   constructor(){
     registerLocaleData(localeEs);
-    
+    if(this.cookie.get('LoginCookie').valueOf() !== 'ALLOWEDTOLOGIN'){
+      this.router.navigate(['/'])
+    }
     
   }
 
@@ -450,6 +470,10 @@ export class ScheduleCalendarComponent implements OnInit{
       case 'CalendarConfig':{
         windowName!.textContent = "Opciones de Calendario";
         break;
+      }
+      case 'ViewSummary':{
+        windowName!.textContent = "Resumen de Proyecto";
+        break;
       } 
       default: {
         windowName!.textContent = "NoOPT";
@@ -586,11 +610,11 @@ lightenColor(hex: string, percent: number): string {
 
   
 
-  public async autoClicked(event: Event){
+  public async autoClicked(){
 
-    
+    const clicked = this.checkAuto.nativeElement as HTMLInputElement;
 
-    const clicked = (event.target as HTMLInputElement).checked;
+    //const clicked = (event.target as HTMLInputElement);
 
     const currentDate: Date = new Date();
 
@@ -599,8 +623,10 @@ lightenColor(hex: string, percent: number): string {
     let bestStartDate = new Date();
 
     if(this.plantillaElegida === undefined){
-      return
+      clicked.checked = false;
+      return;
     }
+    clicked.checked = true;
 
     const updatedUsers: User[] = this.users.map(user => ({
       ...user,
@@ -644,6 +670,8 @@ lightenColor(hex: string, percent: number): string {
       type: link.type
     } as Link));
 
+    let copiaTasks: Task[] = []
+
     let asignable:boolean = false;
 
     while(!asignable){
@@ -661,9 +689,10 @@ lightenColor(hex: string, percent: number): string {
         }
       };
 
-      let copiaTasks = parsedTasks.map((task:Task)=>{
-        return task;
-      });
+      copiaTasks = parsedTasks.map((task:Task)=>({
+        ...task,
+        users: [...task.users.map(user => ({ ...user }))]
+      }));
       let copiaLinks = parsedLinks.map((link:Link)=>{
         return link;
       });
@@ -675,6 +704,7 @@ lightenColor(hex: string, percent: number): string {
        }
     }
 
+    bestStartDate = this.proyectSpan(copiaTasks).startDate;
 
     fecha.value = format(bestStartDate, "yyyy-MM-dd HH:mm");
 
@@ -801,13 +831,14 @@ lightenColor(hex: string, percent: number): string {
   }
 
   public async parsearPlantilla() {
-  const date = (this.dateStartNPCP.nativeElement as HTMLInputElement).value;
+  let date = (this.dateStartNPCP.nativeElement as HTMLInputElement).value;
   
 
   const updatedUsers: User[] = this.users.map(user => ({
     ...user,
     tareas: user.tareas ? user.tareas.map(t => ({ ...t })) : []
   }));
+
 
   if (date !== "" || this.plantillaElegida !== undefined) {
     const tareasPlantilla: TareaPlantilla[] = await this.proyects.GetTemplateTasks(this.plantillaElegida!.id);
@@ -877,39 +908,14 @@ lightenColor(hex: string, percent: number): string {
       return;
     }
   }
-/*
-  private getDependentTaskObjects(task: Task, tasks: Task[], links: Link[]): Task[] {
-    const dependentsMap = new Map<number, number[]>();
 
-    for (const link of links) {
-      if (!dependentsMap.has(link.source)) {
-        dependentsMap.set(link.source, []);
-      }
-      dependentsMap.get(link.source)!.push(link.target);
-    }
-
-    const resultIds = new Set<number>();
-    const visited = new Set<number>();
-    const stack = [task.id];
-
-    while (stack.length > 0) {
-      const currentId = stack.pop()!;
-      if (visited.has(currentId)) continue;
-      visited.add(currentId);
-
-      const children = dependentsMap.get(currentId) || [];
-
-      for (const childId of children) {
-        resultIds.add(childId);
-        stack.push(childId);
-      }
-    }
-
-    const dependents = tasks.filter(t => resultIds.has(t.id));
-    return dependents;
-  }
-*/
   public elegirPlantilla(plantilla: Plantilla){
+    let date = (this.dateStartNPCP.nativeElement as HTMLInputElement);
+    if((this.plantillaElegida !== undefined) && (this.plantillaElegida.id !== plantilla.id)){
+      this.autoClicked();
+      //date.value = "";
+    }
+    
     this.plantillaElegida = plantilla;
   }
   private addUsersToTasks(usersForTasks: User[], tasks: Task[], proyect: Proyect, links: Link[], plantillasTarea: TareaPlantilla[]): boolean{
@@ -1125,8 +1131,7 @@ private parseTemplateTasksToGanttTasks(tasks: TareaPlantilla[], links: Link[], p
   const [hora2, minuto2] = horaSalida.split(':').map(Number);
 
   const duracionJornada =  (hora2 - hora1) * 60 + (minuto2 - minuto1);
-  //console.log(duracionJornada)
-  //console.log(hora1, minuto1, hora2, minuto2);
+
 
   const templateTasks = tasks.map((task) => {
     

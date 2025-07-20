@@ -23,14 +23,16 @@ export class dbDAO {
 
   constructor() { }
 
-  public async GetUser(uname: string, pass: string): Promise<User | undefined> {
+  public async GetUser(uname: string, pass: string): Promise<{user: User, token: string} | undefined> {
     const params = new URLSearchParams({
       uname: uname.trim().toLowerCase(),
       pass: pass.trim()
     });
     const res = await fetch(`http://localhost:3000/users/auth?${params}`);
     if (res.status === 200) {
-      return await res.json() as User;
+      let response = await res.json()
+      let retVal = {user: response as User, token: response._id}
+      return retVal;
     }
     // 404 → usuario no encontrado / credenciales inválidas
     return undefined;
