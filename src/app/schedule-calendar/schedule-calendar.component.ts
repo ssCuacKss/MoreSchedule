@@ -132,7 +132,7 @@ import { CookieService } from 'ngx-cookie-service';
                 {{tarea.start_date}}
               </p>
               <p>
-                {{tarea.duration}}
+                {{tarea.duration - tarea.offtime}}
               </p>
               <p>
                 {{tarea.slack}}
@@ -1318,7 +1318,12 @@ private parseTemplateTasksToGanttTasks(tasks: TareaPlantilla[], links: Link[], p
       ++tiempoFueraDeJornada;
     }
     
-    const adaptedTask: Task = {id: task.id, text: task.text, start_date: format(fechaInicioTarea, "yyyy-MM-dd HH:mm"), duration: (fechaFinConFinesDeSemana.getTime() - fechaInicioTarea.getTime())/60000, offtime: tiempoFueraDeJornada * 1440, details: "", slack: 0, slack_used: 0,progress: 0 ,users: [] } 
+    const duracionTotal = Math.round((fechaFinConFinesDeSemana.getTime() - fechaInicioTarea.getTime()) / 60000);
+    const duracionReal = task.duration;
+    const tiempoNoProductivo = duracionTotal - duracionReal;
+
+
+    const adaptedTask: Task = {id: task.id, text: task.text, start_date: format(fechaInicioTarea, "yyyy-MM-dd HH:mm"), duration: duracionTotal, offtime: tiempoNoProductivo, details: "", slack: 0, slack_used: 0,progress: 0 ,users: [] } 
 
     adaptedTasks.push(adaptedTask);
 
