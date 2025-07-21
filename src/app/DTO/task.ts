@@ -6,6 +6,7 @@ export interface Task {
     offtime: number,
     details: string,
     slack: number,
+    slack_used: number,
     progress: number,
     users: {
         uname: string

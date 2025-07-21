@@ -123,6 +123,7 @@ export class dbDAO {
           offtime: task.offtime,
           details: task.details,
           slack: task.slack,
+          slack_used: task.slack_used,
           progress: task.progress,
           users: task.users ?? []
         }

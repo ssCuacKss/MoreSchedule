@@ -37,8 +37,8 @@
 }
 
 #removeProyectImg{
-  max-width: 1.5rem;
-  max-height: 1.5rem;
+  max-width: 1.6rem;
+  max-height: 1.6rem;
   filter: invert(1);
   transition: 0.2s;
 }
@@ -63,12 +63,12 @@
 #viewSummaryHolder{
   margin-left: 10px;
   position: relative;
-  top: 5px
+  top: 4px;
 
 }
 
 #viewProyectSummaryImg{
-  max-width: 1.5rem;
+  max-width: 1.3rem;
   max-height: 1.5rem;
   filter: invert(1);
   transition: 0.2s;
@@ -163,10 +163,15 @@
   background-color: lightgray;
 }
 
+#menu-five{
+  margin-left: auto;
+}
+
 .closed {
   visibility: hidden;
   position: absolute;
 }
+
 
 @keyframes bottom-to-top {
   0% {
@@ -183,7 +188,7 @@
 .configPanel {
   min-width: 35rem;
   min-height: fit-content;
-  max-width: 35rem;
+  max-width: 55rem;
   border: 1px solid black;
   position: absolute;
   top: 50%;
@@ -742,7 +747,7 @@ input[type="submit"]:active{
   transition: .3s;
 }
 
-/*reglas de estiolo para nuevo proyecto sin plantilla*/
+/*reglas de estilo para nuevo proyecto sin plantilla*/
 
 
 #proyectNameInput{
@@ -784,4 +789,55 @@ input[type="submit"]:active{
   background-color: #024cbd;
   color: #FFFFFF;
   transition: .3s;
+}
+
+
+/* reglas de estilo para resumen de proyectos */
+
+#proyectDataHeaders{
+  display: grid;
+  grid-template-columns: 8rem 7rem 6rem 6rem 6rem 6rem;
+  align-items: center;
+  gap: .1rem;
+  border-top: 1px solid black;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+  border-bottom: 1px solid lightgray;
+}
+
+#proyectDataHeaders h4{
+  display: flex;
+  justify-content: center;
+  align-items: center; 
+  text-align: center; 
+  border-right: 1px solid lightgray;
+  height: 4rem;
+}
+
+#proyectDataHeaders h4:last-child{
+  border-right: none;
+}
+
+#proyectDataItem{
+  display: grid;
+  grid-template-columns: 8rem 7rem 6rem 6rem 6rem 6rem;
+}
+
+#proyectDataItem p{
+  text-align: center;
+}
+
+#proyectDataField{
+  max-height: 20rem;
+  overflow-y: auto;
+  border-bottom: 1px solid black;
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px;
+}
+
+#proyectState{
+  font-size: x-large;
+  font-weight: bold;
+  text-align: center;
+  padding-top: 1.4rem;
 }

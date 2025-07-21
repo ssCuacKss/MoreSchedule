@@ -257,6 +257,7 @@ async function main() {
                 typeof t.duration   !== 'number' || 
                 typeof t.details !== 'string' || 
                 typeof t.slack !== 'number' ||
+                typeof t.slack_used !== 'number' ||
                 typeof t.offtime !== 'number' ||
                 typeof t.progress !== 'number' ||
                 !Array.isArray(t.users)
@@ -277,6 +278,7 @@ async function main() {
                 details: t.details ?? "",
                 offtime: t.offtime,
                 slack: t.slack,
+                slack_used: t.slack_used,
                 progress: t.progress,
                 users: t.users
             }));

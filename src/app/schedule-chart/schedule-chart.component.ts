@@ -193,6 +193,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
         start_date: format(proyectStart.getTime() + task.start_date * 3600000, "yyyy-MM-dd HH:mm"),
         details: "",
         slack: 0,
+        slack_used: 0,
         progress: 0,
         users: [],
         user_count: task.user_count };

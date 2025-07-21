@@ -1,9 +1,9 @@
 import { Component, ElementRef, inject, LOCALE_ID, OnInit, ViewChild } from '@angular/core';
 import { CalendarDateFormatter, CalendarEvent, CalendarModule, CalendarMonthViewDay } from 'angular-calendar';
 import { SchedulerDateFormatter, SchedulerModule } from 'angular-calendar-scheduler';
-import { startOfDay, addHours, addMonths, subMonths, isSameMonth, isSameDay, format, add, addMinutes, isSaturday, isSunday} from 'date-fns';
+import { addHours, addMonths, subMonths, isSameMonth, isSameDay, format, add, addMinutes, isSaturday, isSunday} from 'date-fns';
 import { Router } from '@angular/router';
-import { CommonModule, formatNumber, registerLocaleData } from '@angular/common';
+import { CommonModule, registerLocaleData } from '@angular/common';
 import localeEs from '@angular/common/locales/es';
 import { DOCUMENT } from '@angular/common';
 import { ReactiveFormsModule} from '@angular/forms';
@@ -49,8 +49,8 @@ import { CookieService } from 'ngx-cookie-service';
               <li (click)="selectOption('EditarUsuario')">Editar Usuario</li>
             </ul>
           </li>
-          <li (click)="selectOption('CalendarConfig')" class="item" id="menu-four">Calendario
-          </li>
+          <li (click)="selectOption('CalendarConfig')" class="item" id="menu-four">Calendario</li>
+          <li (click)="cerrarSesion()" class="item" id="menu-five">Cerrar Sesión</li>
         </ul>
       </div>
       <div class="calendar-controls" #buttons>
@@ -102,9 +102,53 @@ import { CookieService } from 'ngx-cookie-service';
           </div>
         </div>
         <ng-template #viewSummary>
-
+          <h3>{{calendarEventDatos?.title}}</h3>
+          <div id="proyectDataHeaders">
+            <h4>
+              Tarea
+            </h4>
+            <h4>
+              fecha<br>de<br>Inicio
+            </h4>
+            <h4>
+              Duración<br>(mins)
+            </h4>
+            <h4>
+              Holgura<br>(mins)
+            </h4>
+            <h4>
+              Holgura<br>Usada
+            </h4>
+            <h4>
+              Progreso
+            </h4>
+          </div>
+          <div id="proyectDataField">
+            <div id="proyectDataItem" *ngFor="let tarea of proyectoAResumir">
+              <p>
+                {{tarea.text}}
+              </p>
+              <p>
+                {{tarea.start_date}}
+              </p>
+              <p>
+                {{tarea.duration}}
+              </p>
+              <p>
+                {{tarea.slack}}
+              </p>
+              <p>
+                {{tarea.slack_used}}
+              </p>
+              <p>
+                {{tarea.progress*100}}%
+              </p>
+            </div>
+          </div>
+          <p id="proyectState">Estado: {{proyectStatus}}</p>
         </ng-template>
-      <ng-template #calendarConfig>
+      
+        <ng-template #calendarConfig>
         <h3>Horas de trabajo</h3>
           <div class="workHours">
             <p>Entrada</p>
@@ -242,7 +286,7 @@ import { CookieService } from 'ngx-cookie-service';
           <button  id="viewProyectSummaryButton">
           </button>
           <label id="viewSummaryHolder">
-            <img src="https://icon-library.com/images/list-icon-png/list-icon-png-0.jpg" id=viewProyectSummaryImg alt="listIconSummary" width="500" height="600" (click)="selectOption('ViewSummary')">
+            <img src="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fwww.pngplay.com%2Fwp-content%2Fuploads%2F7%2FChecklist-Logo-Transparent-Image.png&f=1&nofb=1&ipt=503af8392e5e616fdbdc39e84653915bb17e4ff84330a1004d78c9277331916c" id=viewProyectSummaryImg alt="listIconSummary" width="500" height="600" (click)="getProyectData(event); selectOption('ViewSummary')">
           </label>
         </span>
       </ng-template>
@@ -276,6 +320,9 @@ export class ScheduleCalendarComponent implements OnInit{
   private users!: User[];
   public usuariosFront!: User[];
   private plantillaElegida?: Plantilla = undefined;
+  public calendarEventDatos?: CalendarEvent = undefined;
+  public proyectoAResumir: Task[] = [];
+  public proyectStatus: string = "";
   
   @ViewChild("config") private config!: ElementRef;
   @ViewChild("nav") private nav!: ElementRef;
@@ -326,9 +373,6 @@ export class ScheduleCalendarComponent implements OnInit{
   async downloadEvents(){
     let dbproyects = await this.proyects.GetProyects();
     this.events = dbproyects ?? [];
-    //let cal = this.events[0]
-    //let proyect: Proyect = {id: (cal.id as number)+1, start: cal.start, end: getHours(cal.end!.getTime() - cal.start!.getTime())+32 ,title: cal.title, color: {primary: cal.color!.primary as string, secondary: cal.color!.secondary as string} }
-    //await this.proyects.createProyect(proyect);
   }
 
   previousMonth(): void {
@@ -514,31 +558,31 @@ export class ScheduleCalendarComponent implements OnInit{
 
   getRandomHexColor(): { color: string; dimmed: string } {
 
-  const randomInt = Math.floor(Math.random() * 0x1000000);
-  const color = `#${randomInt.toString(16).padStart(6, '0')}`.toUpperCase();
+    const randomInt = Math.floor(Math.random() * 0x1000000);
+    const color = `#${randomInt.toString(16).padStart(6, '0')}`.toUpperCase();
 
-  const dimmed = this.lightenColor(color, 0.6);
-  return { color, dimmed };
-}
+    const dimmed = this.lightenColor(color, 0.6);
+    return { color, dimmed };
+  }
 
 
-lightenColor(hex: string, percent: number): string {
+  lightenColor(hex: string, percent: number): string {
   
-  const num = parseInt(hex.slice(1), 16);
-  let r = (num >> 16) & 0xFF;
-  let g = (num >> 8) & 0xFF;
-  let b = num & 0xFF;
-
- 
-  r = Math.round(r + (255 - r) * percent);
-  g = Math.round(g + (255 - g) * percent);
-  b = Math.round(b + (255 - b) * percent);
+    const num = parseInt(hex.slice(1), 16);
+    let r = (num >> 16) & 0xFF;
+    let g = (num >> 8) & 0xFF;
+    let b = num & 0xFF;
 
   
-  return `#${((1 << 24) | (r << 16) | (g << 8) | b)
-    .toString(16)
-    .slice(1)
-    .toUpperCase()}`;
+    r = Math.round(r + (255 - r) * percent);
+    g = Math.round(g + (255 - g) * percent);
+    b = Math.round(b + (255 - b) * percent);
+
+    
+    return `#${((1 << 24) | (r << 16) | (g << 8) | b)
+      .toString(16)
+      .slice(1)
+      .toUpperCase()}`;
   }
 
   public formatDateToISO(usDate: string | undefined): string | undefined {
@@ -616,11 +660,17 @@ lightenColor(hex: string, percent: number): string {
 
     //const clicked = (event.target as HTMLInputElement);
 
+
     const currentDate: Date = new Date();
 
     const fecha =  this.dateStartNPCP.nativeElement as HTMLInputElement;
 
     let bestStartDate = new Date();
+
+    if( clicked.checked === false){
+      fecha.value = ""; 
+      return;
+    }
 
     if(this.plantillaElegida === undefined){
       clicked.checked = false;
@@ -826,6 +876,13 @@ lightenColor(hex: string, percent: number): string {
 
   }
 
+  public cerrarSesion(){
+    if(this.cookie.get('LoginCookie').valueOf() === 'ALLOWEDTOLOGIN'){
+      this.cookie.delete('LoginCookie');
+      this.router.navigate(['/'])
+    }
+  }
+
   public editarPlantilla(plantilla: Plantilla){
     this.router.navigate(['/proyectSchdedule'], {queryParams:{id: plantilla.id ,title: "EditarPlantilla"}});
   }
@@ -839,6 +896,10 @@ lightenColor(hex: string, percent: number): string {
     tareas: user.tareas ? user.tareas.map(t => ({ ...t })) : []
   }));
 
+
+  if(date === ""){
+    return;
+  }
 
   if (date !== "" || this.plantillaElegida !== undefined) {
     const tareasPlantilla: TareaPlantilla[] = await this.proyects.GetTemplateTasks(this.plantillaElegida!.id);
@@ -911,12 +972,17 @@ lightenColor(hex: string, percent: number): string {
 
   public elegirPlantilla(plantilla: Plantilla){
     let date = (this.dateStartNPCP.nativeElement as HTMLInputElement);
-    if((this.plantillaElegida !== undefined) && (this.plantillaElegida.id !== plantilla.id)){
+    
+    if((this.plantillaElegida === undefined) || (this.plantillaElegida.id !== plantilla.id)){
+      this.plantillaElegida = plantilla;
       this.autoClicked();
+      console.log("la plantilla ha cambiado");
       //date.value = "";
+    }else{
+      console.log("la plantilla no ha cambiado");
     }
     
-    this.plantillaElegida = plantilla;
+    
   }
   private addUsersToTasks(usersForTasks: User[], tasks: Task[], proyect: Proyect, links: Link[], plantillasTarea: TareaPlantilla[]): boolean{
 
@@ -993,6 +1059,26 @@ lightenColor(hex: string, percent: number): string {
     //console.log(Math.ceil((latestEnd.getTime() - earliestStart.getTime())/3600000));
 
     return { startDate: earliestStart, hours: Math.ceil((latestEnd.getTime() - earliestStart.getTime())/3600000) };
+  }
+
+  public async getProyectData(event: CalendarEvent): Promise<void>{
+    this.calendarEventDatos = event;
+    let pid = event.id;
+    if(pid !== undefined){
+      this.proyectoAResumir = await this.proyects.GetProyectTasks(pid as number).then((tasks: Task[])=>{
+        return tasks;
+      });
+      this.proyectStatus = "En Tiempo";
+      this.proyectoAResumir.forEach((task:Task)=>{
+        if(task.slack_used > 0 && task.progress < 1){
+          this.proyectStatus = "Riesgo de Retraso";
+        }
+        if(task.slack < task.slack_used){
+            this.proyectStatus = "Retrasado";
+          }
+      });
+    }
+
   }
   
   public checkValidCredentials(uname: string, pass: string, admin: boolean): {result: boolean, error: string}{
@@ -1144,6 +1230,7 @@ private parseTemplateTasksToGanttTasks(tasks: TareaPlantilla[], links: Link[], p
       start_date: format(proyectStart.getTime() + task.start_date * 3600000, "yyyy-MM-dd HH:mm"),
       details: "",
       slack: 0,
+      slack_used: 0,
       progress: 0,
       users: []
     };
@@ -1231,7 +1318,7 @@ private parseTemplateTasksToGanttTasks(tasks: TareaPlantilla[], links: Link[], p
       ++tiempoFueraDeJornada;
     }
     
-    const adaptedTask: Task = {id: task.id, text: task.text, start_date: format(fechaInicioTarea, "yyyy-MM-dd HH:mm"), duration: (fechaFinConFinesDeSemana.getTime() - fechaInicioTarea.getTime())/60000, offtime: tiempoFueraDeJornada * 1440, details: "", slack: 0, progress: 0 ,users: [] } 
+    const adaptedTask: Task = {id: task.id, text: task.text, start_date: format(fechaInicioTarea, "yyyy-MM-dd HH:mm"), duration: (fechaFinConFinesDeSemana.getTime() - fechaInicioTarea.getTime())/60000, offtime: tiempoFueraDeJornada * 1440, details: "", slack: 0, slack_used: 0,progress: 0 ,users: [] } 
 
     adaptedTasks.push(adaptedTask);
 
