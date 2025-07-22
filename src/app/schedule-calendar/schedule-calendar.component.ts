@@ -22,7 +22,6 @@ import { CookieService } from 'ngx-cookie-service';
 
 
 
-
 @Component({
   selector: 'app-schedule-calendar',
   imports: [CommonModule ,CalendarModule, SchedulerModule,ReactiveFormsModule],
@@ -141,13 +140,13 @@ import { CookieService } from 'ngx-cookie-service';
                 {{tarea.slack_used}}
               </p>
               <p>
-                {{tarea.progress*100}}%
+                {{tarea.progress*100 | number:'1.0-2'}}%
               </p>
             </div>
           </div>
           <p id="proyectState">Estado: {{proyectStatus}}</p>
         </ng-template>
-      
+    
         <ng-template #calendarConfig>
         <h3>Horas de trabajo</h3>
           <div class="workHours">
@@ -215,7 +214,7 @@ import { CookieService } from 'ngx-cookie-service';
               <label for="disponible">Disponible</label>
             </div>
             </div>   
-            <input type="button" value="eliminar" (click)="eliminarUsuario(user, i)" >
+            <input type="button" value="eliminar" (click)="eliminarUsuario(user)" >
             <div id="operatorTasks" *ngIf="(user.disponible && user.tareas !== undefined && user.tareas !== null && user.tareas.length !== 0)">
             <div class="tareasEnLinea">
               <div *ngFor="let tarea of user.tareas; index as j">
@@ -314,7 +313,7 @@ export class ScheduleCalendarComponent implements OnInit{
   private cookie: CookieService = inject(CookieService);
   private lock: boolean = false;
   public configOption: string = "";
-  private proyects: dbDAO = inject(dbDAO);
+  private dbDao: dbDAO = inject(dbDAO);
   public calendarConfigData!: CalendarConfig;
   public plantillas!: Plantilla[];
   private users!: User[];
@@ -356,22 +355,22 @@ export class ScheduleCalendarComponent implements OnInit{
   }
 
   async ngOnInit(): Promise<void> {
-      this.plantillas = await this.proyects.GetTemplates().then((plantillas: Plantilla[]) =>{
+      this.plantillas = await this.dbDao.GetTemplates().then((plantillas: Plantilla[]) =>{
         return plantillas;
       });
 
       this.downloadEvents();
-      this.calendarConfigData = await this.proyects.GetCalendarConfig().then((config: CalendarConfig) => {
+      this.calendarConfigData = await this.dbDao.GetCalendarConfig().then((config: CalendarConfig) => {
         return config;
       });
 
-      this.users = await this.proyects.GetUsers().then((users: User[])=>{return users})
+      this.users = await this.dbDao.GetUsers().then((users: User[])=>{return users})
       this.usuariosFront = this.users.map(user => ({ ...user }));
       //console.log(this.usuariosFront);
     }
 
   async downloadEvents(){
-    let dbproyects = await this.proyects.GetProyects();
+    let dbproyects = await this.dbDao.GetProyects();
     this.events = dbproyects ?? [];
   }
 
@@ -624,7 +623,7 @@ export class ScheduleCalendarComponent implements OnInit{
     }
     
 
-    await this.proyects.updateCalendarConfigPromise(this.calendarConfigData);
+    await this.dbDao.updateCalendarConfigPromise(this.calendarConfigData);
   }
 
   public agregarFechas(){
@@ -673,6 +672,7 @@ export class ScheduleCalendarComponent implements OnInit{
     }
 
     if(this.plantillaElegida === undefined){
+      alert(`Advertencia: Esta casilla solo se puede marcar una vez elegida una plantilla`);
       clicked.checked = false;
       return;
     }
@@ -706,9 +706,9 @@ export class ScheduleCalendarComponent implements OnInit{
 
     //console.log(bestStartDate);
 
-    const tareasPlantilla: TareaPlantilla[] = await this.proyects.GetTemplateTasks(this.plantillaElegida!.id);
+    const tareasPlantilla: TareaPlantilla[] = await this.dbDao.GetTemplateTasks(this.plantillaElegida!.id);
     
-    const linksPlantilla: LinkPlantilla[] = await this.proyects.GetTemplateLinks(this.plantillaElegida!.id);
+    const linksPlantilla: LinkPlantilla[] = await this.dbDao.GetTemplateLinks(this.plantillaElegida!.id);
     
     
 
@@ -789,7 +789,7 @@ export class ScheduleCalendarComponent implements OnInit{
         }
       }
       
-      await this.proyects.createProyect(ProyectToSave);
+      await this.dbDao.createProyect(ProyectToSave);
       this.events = [...this.events, calendarEvent];
       //console.log(this.events);
       this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: ProyectToSave.id, name: ProyectToSave.title}});
@@ -799,6 +799,9 @@ export class ScheduleCalendarComponent implements OnInit{
 
   async eraseProyect(event: CalendarEvent){
 
+    if(!confirm(`Está a punto de borrar el proyecto ${event.title}.\nEsta opción no se puede deshacer.\n ¿Desea continuar?`)){
+      return;
+    }
 
     //console.log(this.usuariosFront);
     const proyectId: number = event.id as number;
@@ -842,8 +845,8 @@ export class ScheduleCalendarComponent implements OnInit{
     const indexOfEvent = this.events.indexOf(event);
     this.events.splice(indexOfEvent, 1);
 
-    await this.proyects.deleteAllByPidPromise(event.id as number);
-    await this.proyects.deleteProyectByPidPromise(event.id as number);
+    await this.dbDao.deleteAllByPidPromise(event.id as number);
+    await this.dbDao.deleteProyectByPidPromise(event.id as number);
 
     this.events = [...this.events];
     
@@ -858,8 +861,8 @@ export class ScheduleCalendarComponent implements OnInit{
 
     this.plantillas = [...this.plantillas];
 
-    await this.proyects.deleteTemplateAllByPidPromise(element.id);
-    await this.proyects.deleteTemplateByTidPromise(element.id);
+    await this.dbDao.deleteTemplateAllByPidPromise(element.id);
+    await this.dbDao.deleteTemplateByTidPromise(element.id);
 
   }
 
@@ -870,17 +873,21 @@ export class ScheduleCalendarComponent implements OnInit{
 
     plantilla = {title: "Nueva Plantilla", end: 0, id: index};
 
-    await this.proyects.createTemplate(plantilla);
+    await this.dbDao.createTemplate(plantilla);
 
     this.router.navigate(['/proyectSchdedule'], {queryParams:{id: plantilla.id ,title: "EditarPlantilla"}});
 
   }
 
   public cerrarSesion(){
-    if(this.cookie.get('LoginCookie').valueOf() === 'ALLOWEDTOLOGIN'){
-      this.cookie.delete('LoginCookie');
-      this.router.navigate(['/'])
+    if(confirm("Está a punto de cerrar la sesión.\n¿Está seguro?")){
+      this.cookie.delete('LoginCookie'); 
+      this.router.navigate(['/']);
+      
     }
+    
+    
+    
   }
 
   public editarPlantilla(plantilla: Plantilla){
@@ -902,9 +909,9 @@ export class ScheduleCalendarComponent implements OnInit{
   }
 
   if (date !== "" || this.plantillaElegida !== undefined) {
-    const tareasPlantilla: TareaPlantilla[] = await this.proyects.GetTemplateTasks(this.plantillaElegida!.id);
+    const tareasPlantilla: TareaPlantilla[] = await this.dbDao.GetTemplateTasks(this.plantillaElegida!.id);
     
-    const linksPlantilla: LinkPlantilla[] = await this.proyects.GetTemplateLinks(this.plantillaElegida!.id);
+    const linksPlantilla: LinkPlantilla[] = await this.dbDao.GetTemplateLinks(this.plantillaElegida!.id);
     
     const parsedLinks = linksPlantilla.map((link: LinkPlantilla) => ({
       id: link.id,
@@ -950,8 +957,8 @@ export class ScheduleCalendarComponent implements OnInit{
 
     //console.log(this.users, this.usuariosFront);
 
-    await this.proyects.createProyect(ProyectToSave);
-    await this.proyects.SaveProyectTasksandLinks(ProyectToSave.id, parsedTasks, parsedLinks);
+    await this.dbDao.createProyect(ProyectToSave);
+    await this.dbDao.SaveProyectTasksandLinks(ProyectToSave.id, parsedTasks, parsedLinks);
     await this.actualizarUsuarios();
 
     this.users = this.usuariosFront.map(user => ({
@@ -1006,7 +1013,7 @@ export class ScheduleCalendarComponent implements OnInit{
           
           foundCandidates++;
           user.tareas = [];
-          user.tareas.push({tarea: task.text, acaba: format(new Date(new Date(task.start_date).getTime() + task.duration * 60000), "yyyy-MM-dd HH:mm"), pid: proyect.id });
+          user.tareas.push({tarea: task.text, acaba: format(new Date(new Date(task.start_date).getTime() + task.duration * 60000), "yyyy-MM-dd HH:mm"), pid: proyect.id, tid: task.id});
           task.users.push({uname: user.uname});
           
         
@@ -1015,7 +1022,7 @@ export class ScheduleCalendarComponent implements OnInit{
           const taskEnd = new Date(taskStart.getTime() + task.duration * 60000);
           const endFormatted = format(taskEnd, "yyyy-MM-dd HH:mm");
 
-          user.tareas.unshift({tarea: task.text,acaba: endFormatted,pid: proyect.id});
+          user.tareas.unshift({tarea: task.text,acaba: endFormatted,pid: proyect.id, tid: task.id});
 
           task.users.push({uname: user.uname});
           foundCandidates++;
@@ -1065,9 +1072,10 @@ export class ScheduleCalendarComponent implements OnInit{
     this.calendarEventDatos = event;
     let pid = event.id;
     if(pid !== undefined){
-      this.proyectoAResumir = await this.proyects.GetProyectTasks(pid as number).then((tasks: Task[])=>{
+      this.proyectoAResumir = await this.dbDao.GetProyectTasks(pid as number).then((tasks: Task[])=>{
         return tasks;
       });
+      console.log(this.proyectoAResumir);
       this.proyectStatus = "En Tiempo";
       this.proyectoAResumir.forEach((task:Task)=>{
         if(task.slack_used > 0 && task.progress < 1){
@@ -1132,7 +1140,7 @@ export class ScheduleCalendarComponent implements OnInit{
 
     if(isValid.result){
       const newUser: User = {uname: uname, pass: pass, admin: admin, disponible: false};
-      await this.proyects.createUser(newUser);
+      await this.dbDao.createUser(newUser);
       this.users.push(newUser);
       this.usuariosFront.push(newUser);
       this.enableView();
@@ -1143,9 +1151,17 @@ export class ScheduleCalendarComponent implements OnInit{
     
 
   }
-  public async eliminarUsuario(usuario: User, index: number){
+  public async eliminarUsuario(usuario: User){
     
-    await this.proyects.deleteUser(usuario);
+    if(!confirm(`Está a punto de eliminar al usuario ${usuario}.\n Esta acción no se puede deshacer, ¿Está seguro?`)){
+      return;
+    }
+
+    await this.dbDao.deleteUser(usuario);
+    let index = this.users.findIndex((userInList: User)=>
+      userInList.uname === usuario.uname && userInList.pass == usuario.pass
+    );
+
 
     this.users.splice(index, 1);
     this.usuariosFront = this.users.map(user => ({ ...user }));
@@ -1179,13 +1195,13 @@ export class ScheduleCalendarComponent implements OnInit{
     for(let i: number = 0; i < ammountToCompare; i++){
       let index: number = this.users.findIndex((user: User) => user.uname === this.usuariosFront[i].uname && user.pass === this.usuariosFront[i].pass);
       if(index >= 0 && ( this.usuariosFront[i].admin !== this.users[index].admin) || (this.usuariosFront[i].disponible !== this.users[index].disponible) || ((this.usuariosFront[i].tareas?.length ?? 0 )!== (this.users[index].tareas?.length ?? 0))){
-        this.proyects.updateUsers(this.users[index], this.usuariosFront[i]);
+        this.dbDao.updateUsers(this.users[index], this.usuariosFront[i]);
       }
     }
 
     //for(let i: number = 0; i < toCompare; i++){
     //  if((this.usuariosFront[i].uname !== this.users[i].uname) || (this.usuariosFront[i].pass !== this.users[i].pass) || (this.usuariosFront[i].admin !== this.users[i].admin) || (this.usuariosFront[i].disponible !== this.users[i].disponible)){
-    //    this.proyects.updateUsers(this.users[i], this.usuariosFront[i]);
+    //    this.dbDao.updateUsers(this.users[i], this.usuariosFront[i]);
     //    //console.log("algo está cambiado, esto interesea hacerle update: ",this.usuariosFront[i]);
     //  }
     //}

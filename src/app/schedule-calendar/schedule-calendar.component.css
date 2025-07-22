@@ -86,18 +86,21 @@
 #prevMonth {
   border-top-left-radius: 30px;
   border-bottom-left-radius: 30px;
+  height: 5rem;
 }
 
 #nextMonth {
   border-top-right-radius: 30px;
   border-bottom-right-radius: 30px;
+  height: 5rem;
 }
 
 .calendar-controls p {
+  line-height: 2.5rem;
   margin: 0;
-  padding-left: 2.2rem;
-  padding-right: 2.2rem;
-  height: 4.3rem;
+  padding-left: 2.5rem;
+  padding-right: 2.5rem;
+  height: 4.9rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -166,6 +169,11 @@
 #menu-five{
   margin-left: auto;
 }
+
+#menu-five:hover{
+  background-color: #91b9f6;
+}
+
 
 .closed {
   visibility: hidden;
@@ -398,16 +406,18 @@
   display: flex;
   flex-direction: row;
   margin-top: 1.5rem;
+  align-items: center;
 }
 
 #contenedorAdmin input{
   height: 15px;
   width: 15px;
-  margin-top: 10px;
+  align-self: center;
 }
 
 #contenedorAdmin label{
-  margin-top: 10px;
+  width: auto;
+  text-align: center;
 }
 
 .errorMessage{
@@ -460,7 +470,7 @@ input[type="submit"]:active{
 
 .userData{
   display: grid;
-  grid-template-columns: 2rem 15rem 8rem 4rem;
+  grid-template-columns: 2rem 15rem 10rem 4rem;
   grid-template-rows: 2rem auto;
   text-align: center;
   align-items: center;

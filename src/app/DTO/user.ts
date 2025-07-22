@@ -6,6 +6,7 @@ export interface User {
     tareas?: {
         tarea: string,
         acaba: string,
-        pid: number
+        pid: number,
+        tid: number 
     }[]
 }

@@ -20,7 +20,8 @@ import { User } from '../DTO/user';
         <label for="areaTextoPass">Contraseña</label>
         <div class="togglePass">
           <input type="password" placeholder="Ejemplo: Pablo123 (minusculas, mayusculas y numeros) min: 4 caracteres " name="userPass" id="areaTextoPass" formControlName="passWord" #passwordField class="passwordField">
-          <input type="checkbox" (click)="updateAreaType($event)" class="passwordCheck">
+          <input type="checkbox" id="passwordCheckbox" class="passwordCheck">
+          <label for="passwordCheckbox" id="passwordCheckImgHolder"><img id="passwordVisible" width="20" height="20" (click)="updateAreaType($event)" /></label>
         </div>
         <div class="hidden" #errorMessage></div>
         <input type="submit" value="Iniciar Sesión" (click)="submitInfo()"> 
@@ -57,11 +58,13 @@ export class LogInScreenComponent {
   }
 
   public updateAreaType(event: Event){
-    const field = event.target as HTMLInputElement;
-    if(field.checked){
+    const field = event.target as HTMLElement;
+    if(field.id === "passwordVisible"){
       (this.passWordField.nativeElement as HTMLInputElement).type = "text";
+      field.id = "passwordHide";
     }else{
       (this.passWordField.nativeElement as HTMLInputElement).type = "password";
+      field.id = "passwordVisible";
     }
 
   } 

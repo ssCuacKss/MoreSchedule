@@ -1,5 +1,5 @@
 import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject, LOCALE_ID, ɵChangeDetectionSchedulerImpl, AfterViewInit, OnDestroy } from '@angular/core';
-import { gantt, MarkerConfig } from 'dhtmlx-gantt';
+import { gantt } from 'dhtmlx-gantt';
 import { dbDAO } from '../dbDAO';
 import { ActivatedRoute, Route, Router} from '@angular/router';
 import { CPMTask } from '../cpmtask';
@@ -37,7 +37,7 @@ import { CookieService } from 'ngx-cookie-service';
 export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy {
 
 
-  tasksService: dbDAO = inject(dbDAO);
+  dbDao: dbDAO = inject(dbDAO);
   private data: Task[] = [];
   private cpmTasks: CPMTask[] = [];
   private route: ActivatedRoute = inject(ActivatedRoute);
@@ -60,14 +60,14 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
       if(this.id !== null){
         if(this.mode === "verProyecto"){
-          const element = await this.tasksService.GetProyect(this.id).then((proyect: Proyect | any) =>{
+          const element = await this.dbDao.GetProyect(this.id).then((proyect: Proyect | any) =>{
               
             return {id: proyect[0].id, start: proyect[0].start, end: proyect[0].end, title: proyect[0].title, color: proyect[0].color} as Proyect;
           });
           this.nameContent = element.title;
         }
         else if(this.mode === 'EditarPlantilla'){
-          const element = await this.tasksService.GetTemplate(this.id).then((plantilla:  Plantilla | any)=>{
+          const element = await this.dbDao.GetTemplate(this.id).then((plantilla:  Plantilla | any)=>{
             return {id: plantilla[0].id, title: plantilla[0].title, end: plantilla[0].end}
           });
           this.nameContent = element.title;
@@ -105,6 +105,9 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
     gantt.config.start_date = new Date("2025-01-01");
     gantt.config.end_date = gantt.date.add(gantt.config.start_date, 31, 'day');
+
+    gantt.config.drag_resize = true;
+    gantt.config.drag_move = true;
 
     gantt.config.scales = [
       { unit: 'day',  step: 1, format: '%d %M' },
@@ -153,10 +156,10 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
     gantt.init(this.ganttContainer.nativeElement);
 
-    let links = await this.tasksService.GetTemplateLinks(this.id).then((links: LinkPlantilla[])=>{
+    let links = await this.dbDao.GetTemplateLinks(this.id).then((links: LinkPlantilla[])=>{
       return links;
     });
-    let tasks = await this.tasksService.GetTemplateTasks(this.id).then((tasks: TareaPlantilla[])=>{
+    let tasks = await this.dbDao.GetTemplateTasks(this.id).then((tasks: TareaPlantilla[])=>{
       return tasks;
     });
 
@@ -239,13 +242,14 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     let element!: any;
 
 
-    element = await this.tasksService.GetProyect(this.id).then((proyect: Proyect | any) =>{
+    element = await this.dbDao.GetProyect(this.id).then((proyect: Proyect | any) =>{
         
       return {id: proyect[0].id, start: proyect[0].start, end: proyect[0].end, title: proyect[0].title, color: proyect[0].color} as Proyect;
     });
 
 
 
+    
 
     let fecha = this.cambiarFecha(element.start);
 
@@ -255,11 +259,13 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
     gantt.config.start_date = new Date(fecha);
 
+    gantt.config.drag_resize = false;
+    gantt.config.drag_move = false;
 
     gantt.config.end_date   = gantt.date.add(gantt.config.start_date, 31, 'day');
 
     gantt.config.scales = [
-      { unit: 'day',  step: 1, format: '%d %M' },
+      { unit: 'day',  step: 1, format: '%l, %d %M' },
       { unit: 'hour', step: 1, format: '%H:%i' },
       
     ];
@@ -272,7 +278,6 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     gantt.config.time_step = 5;
     gantt.config.round_dnd_dates = false;
     gantt.config.min_duration    = 1 * 60 * 1000;
-    
 
     gantt.config.columns= [
       {name: "text", label: "Titulo", align: "center"},
@@ -289,7 +294,8 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
         time_format: ['%d', '%m', '%Y', '%H:%i'],
         year_range: [gantt.config.start_date.getFullYear() - 1, gantt.config.start_date.getFullYear()+2],
         height: 72,
-        autofix_end: true
+        autofix_end: true,
+        readonly: true
       },
       { name: 'Observaciones', type: 'textarea', map_to: 'details', height: 100 },
       { name: 'Operario 1', type: 'template', map_to: 'usuario_1' },
@@ -317,9 +323,9 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     let Tasks: Task[] = [];
     let Links: Link[] = [];
 
-    Links = await this.tasksService.GetProyectLinks(id);
+    Links = await this.dbDao.GetProyectLinks(id);
     
-    Tasks = await this.tasksService.GetProyectTasks(id);
+    Tasks = await this.dbDao.GetProyectTasks(id);
     
     return {TaskList: Tasks, LinkList: Links};
 
@@ -378,16 +384,16 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       const content = gantt.serialize();
         try {
 
-          const element = await this.tasksService.GetProyect(this.id).then((proyect: Proyect | any) =>{
+          const element = await this.dbDao.GetProyect(this.id).then((proyect: Proyect | any) =>{
               const {startDate, hours} = this.proyectSpan();
               return {id: proyect[0].id, start: format(startDate.toString(), 'MM-dd-yyyy HH:mm'), end: hours, title: name, color: proyect[0].color} as Proyect;
             })
 
-          await this.tasksService.deleteProyectByPidPromise(element.id);
+          await this.dbDao.deleteProyectByPidPromise(element.id);
 
-          await this.tasksService.createProyect(element);
+          await this.dbDao.createProyect(element);
 
-          await this.tasksService.deleteAllByPidPromise(this.id);
+          await this.dbDao.deleteAllByPidPromise(this.id);
           
           //console.log("tareas que se envían al DAO",this.id, content.data, content.links);
 
@@ -395,7 +401,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
             console.log(values['slack']);
           });*/
 
-          await this.tasksService.SaveProyectTasksandLinks(
+          await this.dbDao.SaveProyectTasksandLinks(
             this.id,
             content.data,
             content.links
@@ -408,7 +414,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
         }
         else if(this.mode === 'EditarPlantilla'){
           if(name && this.id){
-            const template = await this.tasksService.GetTemplate(this.id).then((plantilla: Plantilla | any) => {
+            const template = await this.dbDao.GetTemplate(this.id).then((plantilla: Plantilla | any) => {
               const {startDate, hours} = this.proyectSpan();
               return {id: plantilla[0].id, title: name, end: hours};
             });
@@ -419,13 +425,13 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
             try{
 
-              await this.tasksService.deleteTemplateByTidPromise(template.id);
+              await this.dbDao.deleteTemplateByTidPromise(template.id);
 
-              await this.tasksService.createTemplate(template);
+              await this.dbDao.createTemplate(template);
 
-              await this.tasksService.deleteTemplateAllByPidPromise(template.id);
+              await this.dbDao.deleteTemplateAllByPidPromise(template.id);
 
-              await this.tasksService.SaveTemplateTasksandLinks(tareas,enlaces);
+              await this.dbDao.SaveTemplateTasksandLinks(tareas,enlaces);
 
             }catch (error){
               console.log("error: no se pudo guardar correctamente");
@@ -476,7 +482,15 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
   
 
 
-  public returnToCalendar(): void{
+  public async returnToCalendar(): Promise<void>{
+    let tasks: any[] = []
+     gantt.eachTask((task: any)=>{
+      tasks.push(task);
+    })
+    if(tasks.length === 0){
+      await this.dbDao.deleteTemplateByTidPromise(this.id);
+    }
+    
     this.router.navigate(['/Calendar']);
   
   }
