@@ -66,7 +66,7 @@ export class dbDAO {
       user: user,
       update: update
     };
-    return await lastValueFrom(this.http.post<any>(`http://localhost:3000/user/update?`, body))
+    return await lastValueFrom(this.http.post<any>(`http://localhost:3000/user/update`, body))
   }
 
   public async GetCalendarConfig():Promise<CalendarConfig>{

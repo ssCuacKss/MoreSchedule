@@ -2,10 +2,13 @@ const express = require('express');
 const cors = require('cors');
 const { MongoClient } = require('mongodb');
 const { isLeftHandSideExpression } = require('typescript');
+const { interval } = require('rxjs');
+const {format, isSaturday, isSunday} = require('date-fns')
 
 const MONGO_URL = 'mongodb://localhost:27017';
 const DB_NAME   = 'MoreScheduleDBdata';
 const PORT      = 3000;
+const MINUTES_INTERVAL = 5;
 
 async function main() {
 
@@ -19,12 +22,363 @@ async function main() {
     app.use(express.json());
 
     
+
     function parsePid(req, res, next) {
         const pid = parseInt(req.query.pid, 10);
         if (isNaN(pid)) return res.status(400).json({ error: 'pid inválido' });
         req.pid = pid;
         next();
     }
+
+    async function checkChangeOnCalendarProyectDuration(){
+        const currentDate = new Date();
+        let horario = await db.collection('calendarConfig').find().toArray();
+        const proyectos = await db.collection('proyects').find().toArray();
+        const proyectosFuturos = proyectos.filter( proyect => {
+            const startTime = new Date(proyect.start).getTime();
+            const endTime = startTime + proyect.end * 3600000;
+            return currentDate <= endTime;
+        })
+        const proyectosActivos = proyectos.filter(proyect =>{
+            const startTime = new Date(proyect.start).getTime();
+            const endTime = startTime + proyect.end * 3600000;
+            //currentDate.getTime() <= (new Date(proyect.start).getTime() + ( proyect.end * 3600000))
+
+            return startTime <= currentDate && currentDate <= endTime;
+        });
+
+        proyectosFuturos.sort((a, b) => new Date(a.start) - new Date(b.start));
+        proyectosActivos.sort((a, b) => new Date(a.start) - new Date(b.start));
+
+        let usuarios = await db.collection('users').find().toArray();
+        
+        for(let i = 0; i < proyectosActivos.length; i++){
+            let proyecto = proyectosActivos[i];
+            padProyectsSlack(proyecto, horario, usuarios);
+            
+            //console.log(tareasProyecto);
+            //console.log(linksProyecto);
+        }
+
+        for(let i = 0; i < proyectosFuturos.length; i++){
+            const proyecto = proyectosFuturos[i];
+            const tareasProyecto = await db.collection('tasks').find({pid: proyecto.id}).toArray();
+            
+            const usuariosAsignados = getUsuariosConUltimaTareaEnProyecto(proyecto.id, usuarios);
+            
+
+            for(const { usuario, indexUltimaTarea } of usuariosAsignados){
+                const pila = usuario.tareas;
+                //const index = pila.findIndex(t => t.pid === proyecto.id && t.tid === ultimaTarea.id);
+                //console.log(pila);
+                if(indexUltimaTarea === 0){
+                    continue;
+                }
+
+                const ultimaMeta = pila[indexUltimaTarea];
+                const ultimaTarea = tareasProyecto.find(t => t.id === ultimaMeta.tid);
+                if (!ultimaTarea){ 
+                    continue;
+                }
+
+                const siguienteTarea = pila[indexUltimaTarea - 1];
+
+                const siguienteProyecto = proyectosFuturos.find(p => p.id === siguienteTarea.pid);
+                const tareasSiguienteProyecto = await db.collection('tasks').find({pid: siguienteProyecto.id}).toArray();
+                const linksSiguienteProyecto = await db.collection('links').find({pid: siguienteProyecto.id}).toArray();
+                if (!tareasSiguienteProyecto.length) {
+                    continue;
+                }
+                
+                const tareaInicio = tareasSiguienteProyecto[0];
+
+                if (siguienteTarea.tid !== tareaInicio.id) {
+                    continue; 
+                }
+
+                const finUltima = new Date(ultimaTarea.start_date).getTime() + ultimaTarea.duration * 60000;
+                const inicioSiguiente = new Date(tareaInicio.start_date).getTime();
+
+                if (inicioSiguiente < finUltima) {
+                    const desplazamiento = finUltima - inicioSiguiente;
+                    ajustarTiempoDeFin(horario, tareasSiguienteProyecto, linksSiguienteProyecto, desplazamiento);
+                    actualizarTareasEnBD(tareasSiguienteProyecto);
+                    actualizarDuracionYInicioDeProyecto(tareasSiguienteProyecto);
+                    actualizarUsuariosConFinDeTareas(tareasSiguienteProyecto, usuarios)
+                    
+                }
+
+            }
+
+
+        }
+
+        guardarUsuariosActualizados(usuarios);
+        console.log("Finalizado ajuste de tareas por slack");
+    }   
+
+    async function guardarUsuariosActualizados(usuarios) {
+        await Promise.all(
+            usuarios.map(user => {
+            return db.collection('users').updateOne(
+                { uname: user.uname },
+                { $set: { tareas: user.tareas } }
+            );
+            })
+        );
+        }
+
+    async function actualizarUsuariosConFinDeTareas(tareas, usuarios) {
+        for (const tarea of tareas) {
+            const pid = tarea.pid;
+            const tid = tarea.id;
+            if (!tarea.start_date || isNaN(tarea.duration)){ 
+                continue;
+            }
+            const fechaInicio = new Date(tarea.start_date).getTime();
+            const fechaFin = new Date(fechaInicio + tarea.duration * 60000);
+            const fechaFinFormateada = format(fechaFin, "yyyy-MM-dd HH:mm");
+
+            for (const usuario of usuarios) {
+                const pila = usuario.tareas ?? [];
+
+                const index = pila.findIndex(meta => meta.pid === pid && meta.tid === tid);
+                if (index !== -1) {
+                    usuario.tareas[index].acaba = fechaFinFormateada;
+                }
+            }
+        }
+    }
+
+    async function actualizarDuracionYInicioDeProyecto(tareas) {
+    if (!Array.isArray(tareas) || tareas.length === 0) return;
+
+    let minInicio = Infinity;
+    let maxFin = -Infinity;
+    let proyectoId = tareas[0].pid;
+
+    tareas.forEach(tarea => {
+        const inicio = new Date(tarea.start_date).getTime();
+        const fin = inicio + tarea.duration * 60000;
+
+        if (inicio < minInicio) minInicio = inicio;
+        if (fin > maxFin) maxFin = fin;
+    });
+
+    const duracionHoras = Math.round(((maxFin - minInicio) / 3600000) * 100) / 100;
+    const fechaInicio = new Date(minInicio);
+    const fechaInicioFormateada = format(fechaInicio, "MM-dd-yyyy HH:mm");
+
+    await db.collection('proyects').updateOne(
+        { id: proyectoId },
+        {
+        $set: {
+            start: fechaInicioFormateada,
+            end: duracionHoras
+        }
+        }
+    );
+    }
+
+    function getUsuariosConUltimaTareaEnProyecto(pid, usuarios) {
+        const usuariosConTarea = [];
+
+        usuarios.forEach(user => {
+            const tareas = user.tareas ?? [];
+            //console.log(`Estas son las tarreas del usuario ${user.uname}:\n${JSON.stringify(tareas, null, 2)}\n`);
+            // Buscar desde el final la última tarea del proyecto pid
+            for (let i = 0; i < tareas.length ; i++) {
+                if (tareas[i].pid === pid) {
+                    usuariosConTarea.push({
+                        usuario: user,
+                        indexUltimaTarea: i
+                    });
+                    //console.log(`estamos en el user ${user.uname} su ultima tarea para el proyecto ${pid} es ${user.tareas[i].tarea}\n`);
+                    break;
+                }
+            }
+        });
+
+        return usuariosConTarea;
+    }
+
+    function ajustarTiempoDeFin(horario, tareasProyecto, linksProyecto, offsetInicio){
+        
+        const horaEntrada = horario[0].entrada;
+        const horaSalida = horario[0].salida;
+        const [hora1, minuto1] = horaEntrada.split(':').map(Number);
+        const [hora2, minuto2] = horaSalida.split(':').map(Number);
+        const duracionJornada =  (hora2 - hora1) * 60 + (minuto2 - minuto1);
+        
+
+
+        tareasProyecto.forEach(task => {
+            let IncomingLinks = linksProyecto.filter((link) => link.target === task.id);
+            let startDates= [];
+            let totalSlackOverflow = 0;
+            if(IncomingLinks.length !== 0){
+                IncomingLinks.forEach((linkPredecesor)=>{
+                    let taskToAdd = tareasProyecto.find((PredecesorTask) => PredecesorTask.id === linkPredecesor.source );
+                    if(taskToAdd !== undefined){
+                        const endTime = new Date(taskToAdd.start_date).getTime() + taskToAdd.duration * 60000;
+                        totalSlackOverflow += (taskToAdd.slack < taskToAdd.slack_used) ? (taskToAdd.slack_used - taskToAdd.slack) : 0;
+                        startDates.push(new Date(endTime));
+                    }
+                });
+            }   
+
+            let taskAdjustedStartDate = task.start_date;
+
+            if (startDates.length !== 0) {
+                startDates.sort((a, b) => b.getTime() - a.getTime());
+                const startDateWithSlackOverflow = new Date(startDates[0].getTime() + totalSlackOverflow * 60000)
+                taskAdjustedStartDate = format(startDateWithSlackOverflow, "yyyy-MM-dd HH:mm");
+            }
+
+            let fechaInicioTarea = new Date(new Date(taskAdjustedStartDate).getTime() + offsetInicio);
+            const {horaInicioTarea, minutoInicioTarea} = {horaInicioTarea: fechaInicioTarea.getHours(), minutoInicioTarea: fechaInicioTarea.getMinutes()};
+            
+            if(horaInicioTarea < hora1 || ((horaInicioTarea === hora1 ) && (minutoInicioTarea < minuto1))){
+                fechaInicioTarea.setHours(hora1, minuto1);
+            }else if(horaInicioTarea > hora2 || ((horaInicioTarea === hora2 ) && (minutoInicioTarea >= minuto2))){
+                fechaInicioTarea.setHours(hora1, minuto1);
+                fechaInicioTarea = new Date(fechaInicioTarea.getTime() + 86400000);
+            }
+            while(isSaturday(fechaInicioTarea) || isSunday(fechaInicioTarea)){
+                fechaInicioTarea = new Date(fechaInicioTarea.getTime() + 86400000);
+            }
+
+            let fechaFinDirecto = new Date(fechaInicioTarea.getTime() + (task.duration - task.offtime - task.slack_used) * 60000);
+
+            let fullJournals = Math.floor(((task.duration - task.offtime  - task.slack_used )/ duracionJornada));
+
+            let tiempoFinDeSemana = contarFinesDeSemana(fechaInicioTarea, fechaFinDirecto);
+
+            let tiempoFueraDeJornada = tiempoFinDeSemana + fullJournals;
+            let fechaFinConFinesDeSemana = new Date(fechaInicioTarea.getTime() + (task.duration - task.offtime - task.slack_used) * 60000  + tiempoFueraDeJornada * 86400000 );
+            const horaFin = fechaFinConFinesDeSemana.getHours();
+            const minutosFin = fechaFinConFinesDeSemana.getMinutes();
+
+
+            let horasExtra = 0;
+            let minutosExtra = 0;
+
+                if(horaFin > hora2 || (horaFin === hora2 && (minutosFin > minuto2))){
+                    fechaFinConFinesDeSemana.setHours(hora1, minuto1);
+                    fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + 86400000);
+                    ++tiempoFueraDeJornada;
+                    horasExtra = horaFin - hora2;
+                    minutosExtra = minutosFin - minuto2;
+                }
+
+                let timeToAdd = (horasExtra * 60 + minutosExtra) * 60000 ;
+                tiempoFueraDeJornada += ((horasExtra + minutosExtra / 60)/24);
+                fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + timeToAdd);
+                
+                while(isSaturday(fechaFinConFinesDeSemana) || isSunday(fechaFinConFinesDeSemana)){
+                    fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + 86400000);
+                    ++tiempoFueraDeJornada;
+                }
+                
+                const duracionTotal = Math.round((fechaFinConFinesDeSemana.getTime() - fechaInicioTarea.getTime()) / 60000);
+                const duracionReal = task.duration - task.slack_used;
+                
+                const tiempoNoProductivo = duracionTotal - duracionReal;
+
+                task.start_date = format(fechaInicioTarea, "yyyy-MM-dd HH:mm");
+                task.duration = duracionTotal;
+                task.offtime = tiempoNoProductivo;
+
+        });
+
+
+
+    }
+
+    async function padProyectsSlack(proyect, horario, usuarios){
+        
+        const currentDate = new Date().getTime();
+        
+        
+        let tareasProyecto = await db.collection('tasks').find({pid: proyect.id}).toArray();
+        let linksProyecto = await db.collection('links').find({pid: proyect.id}).toArray()
+        
+        
+        tareasProyecto.forEach(tarea =>{
+            let fechaFinTarea = new Date(tarea.start_date).getTime() + (tarea.duration * 60000);
+            if (currentDate > fechaFinTarea  && tarea.progress < 1){
+                let extraTime = (currentDate - fechaFinTarea)/60000;
+            
+                tarea.duration -= tarea.slack_used
+                tarea.duration += extraTime;
+                tarea.slack_used = extraTime;
+                
+
+                /*let succesors = findAllSuccesors(tarea, tareasProyecto, linksProyecto);
+                succesors.forEach(succesor =>{
+                    succesor.start_date = format(new Date(new Date(succesor.start_date).getTime() + (timeToAdd * 60000)), "yyyy-MM-dd HH:mm");
+                })*/
+
+            }
+        });
+        
+        ajustarTiempoDeFin(horario, tareasProyecto, linksProyecto, 0);
+        actualizarTareasEnBD(tareasProyecto);
+        actualizarDuracionYInicioDeProyecto(tareasProyecto);
+        actualizarUsuariosConFinDeTareas(tareasProyecto, usuarios);
+    }
+
+    async function actualizarTareasEnBD(tareas) {
+    if (!Array.isArray(tareas) || tareas.length === 0) return;
+
+    await Promise.all(
+        tareas.map(tarea => {
+        return db.collection('tasks').updateOne(
+            { pid: tarea.pid, id: tarea.id },
+            {
+            $set: {
+                start_date: tarea.start_date,
+                duration: tarea.duration,
+                offtime: tarea.offtime,
+                slack_used: tarea.slack_used
+            }
+            }
+        );
+        })
+    );
+    }
+
+
+    function contarFinesDeSemana(inicio, fin) {
+        let contador = 0;
+        let fecha = new Date(inicio);
+        fecha.setHours(0, 0, 0, 0);
+
+        while (fecha <= fin) {
+            const dia = fecha.getDay();
+            if (dia === 0 || dia === 6) {
+            contador++;
+            }
+            fecha = new Date(fecha.getTime() + 86400000); 
+        }
+
+        return contador;
+    }
+
+    
+    setInterval( async() =>{
+        try{
+            await checkChangeOnCalendarProyectDuration()
+        }catch (error){
+            console.error('UNEXPECTED ERROR ON EXECUTION ADJUSTMENT EXECUTION', error);
+        }
+    },MINUTES_INTERVAL * 60000)
+    
+    
+    
+    checkChangeOnCalendarProyectDuration();
+
+
 
     /**
      * DELETE /tasks?pid=<pid>
@@ -128,24 +482,22 @@ async function main() {
         const pass  = user.pass.trim();
 
         try {
-            // Intentar borrar el usuario original
-            const deleteResult = await db.collection('users').deleteOne({
-                uname: uname,
-                pass:  pass
-            });
+            const uname = user.uname.trim().toLowerCase();
+            const pass = user.pass.trim();
 
-            if (deleteResult.deletedCount === 0) {
-                return res.status(404).json({ error: 'Usuario original no encontrado' });
-            }
-
-            // Insertar el nuevo usuario actualizado
-            await db.collection('users').insertOne({
+            const updateData = {
                 uname: update.uname.trim().toLowerCase(),
-                pass:  update.pass.trim(),
+                pass: update.pass.trim(),
                 admin: update.admin,
                 disponible: update.disponible,
                 tareas: update.tareas
-            });
+            };
+
+            const result = await db.collection('users').findOneAndUpdate(
+                { uname: uname, pass: pass },   
+                { $set: updateData },           
+                { returnDocument: 'after' }     
+            );
 
             return res.status(200).json({ message: 'Usuario actualizado con éxito' });
 
@@ -593,3 +945,34 @@ main().catch(err => {
   console.error('Error iniciando servidor:', err);
   process.exit(1);
 });
+
+
+    function findAllSuccesors(task, tasksProyect, links) {
+        let succesors = [];
+        let contador = 0;
+        let visitados = new Set();
+
+        let sonLinks = links.filter(link => link.source === task.id);
+        sonLinks.forEach(sonLink => {
+            const found = tasksProyect.find(t => t.id === sonLink.target);
+            if (found) {
+                succesors.push(found);
+                visitados.add(found.id);
+            }
+        });
+
+        while (contador < succesors.length) {
+            const current = succesors[contador];
+            const newLinks = links.filter(link => link.source === current.id);
+            newLinks.forEach(link => {
+                const found = tasksProyect.find(t => t.id === link.target);
+                if (found && !visitados.has(found.id)) {
+                    succesors.push(found);
+                    visitados.add(found.id);
+                }
+            });
+            contador++;
+        }
+
+        return succesors;
+    }

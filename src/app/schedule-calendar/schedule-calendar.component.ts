@@ -20,8 +20,6 @@ import { User } from '../DTO/user';
 import { CookieService } from 'ngx-cookie-service';
 
 
-
-
 @Component({
   selector: 'app-schedule-calendar',
   imports: [CommonModule ,CalendarModule, SchedulerModule,ReactiveFormsModule],
@@ -131,7 +129,7 @@ import { CookieService } from 'ngx-cookie-service';
                 {{tarea.start_date}}
               </p>
               <p>
-                {{tarea.duration - tarea.offtime}}
+                {{tarea.duration - tarea.offtime - tarea.slack_used}}
               </p>
               <p>
                 {{tarea.slack}}
@@ -951,6 +949,9 @@ export class ScheduleCalendarComponent implements OnInit{
 
     const asignado = this.addUsersToTasks(updatedUsers, copiaTasks, ProyectToSave, copiaLinks, tareasPlantilla);
 
+    if(!asignado){
+      return;
+    }
 
     // ✅ Asignamos la copia modificada para mostrar en UI
     this.usuariosFront = updatedUsers;
@@ -983,10 +984,10 @@ export class ScheduleCalendarComponent implements OnInit{
     if((this.plantillaElegida === undefined) || (this.plantillaElegida.id !== plantilla.id)){
       this.plantillaElegida = plantilla;
       this.autoClicked();
-      console.log("la plantilla ha cambiado");
+      //console.log("la plantilla ha cambiado");
       //date.value = "";
     }else{
-      console.log("la plantilla no ha cambiado");
+      //console.log("la plantilla no ha cambiado");
     }
     
     
@@ -1070,21 +1071,25 @@ export class ScheduleCalendarComponent implements OnInit{
 
   public async getProyectData(event: CalendarEvent): Promise<void>{
     this.calendarEventDatos = event;
-    let pid = event.id;
+    const pid = event.id;
+    const currentDate = new Date();
     if(pid !== undefined){
       this.proyectoAResumir = await this.dbDao.GetProyectTasks(pid as number).then((tasks: Task[])=>{
         return tasks;
       });
-      console.log(this.proyectoAResumir);
+      //console.log(this.proyectoAResumir);
       this.proyectStatus = "En Tiempo";
-      this.proyectoAResumir.forEach((task:Task)=>{
-        if(task.slack_used > 0 && task.progress < 1){
+      for(let i: number = 0; i < this.proyectoAResumir.length; i++){
+        const task = this.proyectoAResumir[i];
+        const endDate = new Date(new Date(task.start_date).getTime() + (task.duration * 60000));
+        
+        if(task.slack_used > 0 && task.progress < 1 && this.proyectStatus !== "Retrasado" ){
           this.proyectStatus = "Riesgo de Retraso";
         }
-        if(task.slack < task.slack_used){
+        if(task.slack < task.slack_used || endDate < currentDate){
             this.proyectStatus = "Retrasado";
           }
-      });
+      }
     }
 
   }
@@ -1186,7 +1191,7 @@ export class ScheduleCalendarComponent implements OnInit{
 
   }
 
-  public actualizarUsuarios(){
+  public async actualizarUsuarios(){
   
     //console.log(this.usuariosFront, this.users);
 
@@ -1195,7 +1200,7 @@ export class ScheduleCalendarComponent implements OnInit{
     for(let i: number = 0; i < ammountToCompare; i++){
       let index: number = this.users.findIndex((user: User) => user.uname === this.usuariosFront[i].uname && user.pass === this.usuariosFront[i].pass);
       if(index >= 0 && ( this.usuariosFront[i].admin !== this.users[index].admin) || (this.usuariosFront[i].disponible !== this.users[index].disponible) || ((this.usuariosFront[i].tareas?.length ?? 0 )!== (this.users[index].tareas?.length ?? 0))){
-        this.dbDao.updateUsers(this.users[index], this.usuariosFront[i]);
+        await this.dbDao.updateUsers(this.users[index], this.usuariosFront[i]);
       }
     }
 
@@ -1345,7 +1350,7 @@ private parseTemplateTasksToGanttTasks(tasks: TareaPlantilla[], links: Link[], p
 
   });
 
-  console.log(adaptedTasks);
+  //console.log(adaptedTasks);
 
   return adaptedTasks;
 }
