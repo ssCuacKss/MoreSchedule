@@ -37,7 +37,7 @@ import { CookieService } from 'ngx-cookie-service';
 export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy {
 
 
-  dbDao: dbDAO = inject(dbDAO);
+  private dbDao: dbDAO = inject(dbDAO);
   private data: Task[] = [];
   private cpmTasks: CPMTask[] = [];
   private route: ActivatedRoute = inject(ActivatedRoute);

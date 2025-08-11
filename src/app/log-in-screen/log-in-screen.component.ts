@@ -71,7 +71,6 @@ export class LogInScreenComponent {
 
     public async submitInfo(): Promise<void>{
 
-    this.cookie.set('LoginCookie', 'ALLOWEDTOLOGIN', 1);
     let error = (this.errorMessage.nativeElement) as HTMLParagraphElement;
     if(this.regex[1].test(this.loginInfo.value.userName) && this.regex[0].test(this.loginInfo.value.passWord)){
       let valid =  await this.user.GetUser(this.loginInfo.value.userName, this.loginInfo.value.passWord);
@@ -79,6 +78,7 @@ export class LogInScreenComponent {
       error.className = "hidden";
       if(valid){
         error.className = "hidden";
+        this.cookie.set('LoginCookie', 'ALLOWEDTOLOGIN', 1);
         this.redirectToPage(valid.user);
       }else{
         error.innerHTML = "El usuario no existe";

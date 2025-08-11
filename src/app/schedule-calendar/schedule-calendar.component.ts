@@ -155,7 +155,7 @@ import { CookieService } from 'ngx-cookie-service';
             <p>Hasta</p>
             <input type="time" [value]="calendarConfigData.salida" #salida>
           </div>
-          <!--<div class="festivos">
+          <div class="festivos">
             <h3>Dias festivos</h3>
             <div class="dates">
               <input type="date" #fecha1>
@@ -174,7 +174,7 @@ import { CookieService } from 'ngx-cookie-service';
                   <input type="button" value="eliminar" [id]="i" (click)="eraseDate($event)">
               </div>
             </div>
-          </div>-->
+          </div>
           <div id="saveChangesButtonDiv">
             <input type="button" value="Guardar cambios" id="saveCalendarConfig" #saveCalendarConfig (click)="saveConfig()">
             </div>
@@ -795,7 +795,7 @@ export class ScheduleCalendarComponent implements OnInit{
 
   }
 
-  async eraseProyect(event: CalendarEvent){
+  public async eraseProyect(event: CalendarEvent){
 
     if(!confirm(`Está a punto de borrar el proyecto ${event.title}.\nEsta opción no se puede deshacer.\n ¿Desea continuar?`)){
       return;
@@ -833,7 +833,7 @@ export class ScheduleCalendarComponent implements OnInit{
 
     this.usuariosFront = updatedUsers;
 
-    this.actualizarUsuarios();
+    await this.actualizarUsuarios();
 
     this.users = this.usuariosFront.map(user => ({
       ...user,
@@ -1139,9 +1139,7 @@ export class ScheduleCalendarComponent implements OnInit{
     const admin: boolean = this.crearUsuario.get("admin")?.value;
     const errorMessageElement = this.errorMessage.nativeElement as HTMLDivElement;
 
-    
-
-    let isValid: {result: boolean, error: string} = await this.checkValidCredentials(uname, pass, admin);
+    let isValid: {result: boolean, error: string} = this.checkValidCredentials(uname, pass, admin);
 
     if(isValid.result){
       const newUser: User = {uname: uname, pass: pass, admin: admin, disponible: false};
@@ -1154,6 +1152,7 @@ export class ScheduleCalendarComponent implements OnInit{
       errorMessageElement.innerText = isValid.error;
     }
     
+    //console.log(this.users,this.usuariosFront);
 
   }
   public async eliminarUsuario(usuario: User){
@@ -1199,19 +1198,20 @@ export class ScheduleCalendarComponent implements OnInit{
 
     for(let i: number = 0; i < ammountToCompare; i++){
       let index: number = this.users.findIndex((user: User) => user.uname === this.usuariosFront[i].uname && user.pass === this.usuariosFront[i].pass);
+      //console.log(this.usuariosFront[i], "index encontrado ",index)
       if(index >= 0 && ( this.usuariosFront[i].admin !== this.users[index].admin) || (this.usuariosFront[i].disponible !== this.users[index].disponible) || ((this.usuariosFront[i].tareas?.length ?? 0 )!== (this.users[index].tareas?.length ?? 0))){
+        //console.log(`se procederá a actualizar a ${JSON.stringify(this.users[index])} con ${JSON.stringify(this.usuariosFront[i])}`);
         await this.dbDao.updateUsers(this.users[index], this.usuariosFront[i]);
       }
     }
 
-    //for(let i: number = 0; i < toCompare; i++){
-    //  if((this.usuariosFront[i].uname !== this.users[i].uname) || (this.usuariosFront[i].pass !== this.users[i].pass) || (this.usuariosFront[i].admin !== this.users[i].admin) || (this.usuariosFront[i].disponible !== this.users[i].disponible)){
-    //    this.dbDao.updateUsers(this.users[i], this.usuariosFront[i]);
-    //    //console.log("algo está cambiado, esto interesea hacerle update: ",this.usuariosFront[i]);
-    //  }
-    //}
+    this.users = this.usuariosFront.map(user => ({
+      ...user,
+      tareas: user.tareas ? user.tareas.map(t => ({ ...t })) : []
+    }));
 
   }
+
   private contarFinesDeSemana(inicio: Date, fin: Date): number {
     let contador = 0;
     let fecha = new Date(inicio);
