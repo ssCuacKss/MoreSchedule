@@ -31,8 +31,18 @@ async function main() {
     }
 
     async function checkChangeOnCalendarProyectDuration(){
-        const currentDate = new Date();
+
+        //Se obtine la fecha actual y la configuración del horario.
+        //const currentDate = new Date();
+        const currentDate = new Date("2025-08-14 13:00");
+
         let horario = await db.collection('calendarConfig').find().toArray();
+
+        /*Se obtienen todos los proyectos y se filtran de dos formas diferentes
+            1. se obtienen los proyectos futuros del sistema (aquellos que aun no han empezado y su fecha de inicio es mayor que la fecha actual)
+            2. se obtienee los proyectos activos del sistema (aquellos cuya fecha de inicio es inferior a la actual, pero cuya fecha de fin aun no ha llegado)
+        */
+
         const proyectos = await db.collection('proyects').find().toArray();
         const proyectosFuturos = proyectos.filter( proyect => {
             const startTime = new Date(proyect.start).getTime();
@@ -46,34 +56,67 @@ async function main() {
 
             return startTime <= currentDate && currentDate <= endTime;
         });
+        
+        // se ordenan ambos tipos de filtración de fecha de inicio mas próxima a fecha de inicio mas en el futuro (menor a mayor)
 
         proyectosFuturos.sort((a, b) => new Date(a.start) - new Date(b.start));
         proyectosActivos.sort((a, b) => new Date(a.start) - new Date(b.start));
 
+        //se obtienen los usuarios de la aplicación.
+
         let usuarios = await db.collection('users').find().toArray();
         
+        // en este bloque for se coge cada proyecto activo y se analiza si ha habido retraso
+        // tambien tenemos una flag que nos indicará si han habido actualizaciones de proyectos
+
+        let proceed = false;
+
         for(let i = 0; i < proyectosActivos.length; i++){
             let proyecto = proyectosActivos[i];
-            padProyectsSlack(proyecto, horario, usuarios);
+            let updates = await padProyectsSlack(proyecto, horario, usuarios, currentDate).then(upd => {return upd});
             
+            //si en el proyecto actual hay actualización y updates es falso, cambiamos u valor
+            if(updates && !proceed){
+                proceed = true;
+            }
             //console.log(tareasProyecto);
             //console.log(linksProyecto);
         }
 
+        // si tras el proceso anterior no hay actualizaciones en ningun proyecto activo, no hay nada que hacer.
+
+        if(!proceed){
+            console.log("No hay actualizaciones en proyectos activos, nada que hacer");
+            return
+        }
+
+        // en este bloque se recorren todos los proyectos futuros.
+
+
         for(let i = 0; i < proyectosFuturos.length; i++){
             const proyecto = proyectosFuturos[i];
+
+            // se obtienen las tareas del proyecto futuro que estamos iterando
+
             const tareasProyecto = await db.collection('tasks').find({pid: proyecto.id}).toArray();
             
+
+            // se obtienen los usuarios que participan en el proyecto (un usuario tienen tareas asignadas dentro de ese proyecto) y cual es la ultima tarea que tienen asignada dentro de ese proyecto.
+
             const usuariosAsignados = getUsuariosConUltimaTareaEnProyecto(proyecto.id, usuarios);
             
+            // reccorremos un bucle en el que iteramos sobre todos los usuarios asignados al proyecto
 
             for(const { usuario, indexUltimaTarea } of usuariosAsignados){
+
+                //se guardan en una pila todas las tareas del usuario sila ultima tarea de un usuario en el proyecto 
+                // tiene el indice 0 dentro de su pila, no hay proyectos por delante de este proyecto (la ultima tarea de este proyecto no tiene encima ninguna nueva tarea, por tanto no hay otro proyecto)
                 const pila = usuario.tareas;
-                //const index = pila.findIndex(t => t.pid === proyecto.id && t.tid === ultimaTarea.id);
-                //console.log(pila);
                 if(indexUltimaTarea === 0){
                     continue;
                 }
+
+                //comprobamos si en verdad la ultima tarea del proyecto existe. si no existe se procede automaticamente con la siguiente iteración del bucle
 
                 const ultimaMeta = pila[indexUltimaTarea];
                 const ultimaTarea = tareasProyecto.find(t => t.id === ultimaMeta.tid);
@@ -81,7 +124,13 @@ async function main() {
                     continue;
                 }
 
+
+                //miramos cual es la tarea que tiene la ultima tarea justo encima, como hemos visto, si hay tareas por encima de la ultima tarea del proyecto en el que estamos, 
+                // significa que el usuario fue asignado despues de acabar esta tarea a otra tarea de otro proyecto.
+
                 const siguienteTarea = pila[indexUltimaTarea - 1];
+
+                // se obtiene el proyecto al que pertenece dicha siguiente tarea, si el proyecto no tiene tareas, pasamos a la siguiente ejecución del bucle.
 
                 const siguienteProyecto = proyectosFuturos.find(p => p.id === siguienteTarea.pid);
                 const tareasSiguienteProyecto = await db.collection('tasks').find({pid: siguienteProyecto.id}).toArray();
@@ -90,20 +139,30 @@ async function main() {
                     continue;
                 }
                 
+
+                //Obtenemos la primera tarea de dicho siguiente proyecto ( las tareas están ordenadas en base de datos de menor a mayor fecha de inicio)
+                // si la tarea con la que hemos obtenido este proyecto no es la primera tarea del proyecto, simplemente pasamos a la siguiente ejecución del bucle.
                 const tareaInicio = tareasSiguienteProyecto[0];
 
                 if (siguienteTarea.tid !== tareaInicio.id) {
                     continue; 
                 }
 
+                //llegados a este punto comprobamos si la fecha de finalización de la ultima tarea del proyecto en el que nos encontramos
+                //  es mayor que la fecha de inicio de la primera tarea del siguiente proyecto, efectivamente hay un solapamiento entre proyectos, por lo que se procede a ajustar las fechas del siguiente proyecto proyecto.
+
                 const finUltima = new Date(ultimaTarea.start_date).getTime() + ultimaTarea.duration * 60000;
                 const inicioSiguiente = new Date(tareaInicio.start_date).getTime();
 
                 if (inicioSiguiente < finUltima) {
+                    //se obtiene el tiempo que hay que desplazar el siguiente proyecto.
                     const desplazamiento = finUltima - inicioSiguiente;
+                    // se actualizan las tareas del siguiente proyecto con su nueva duración y plazos horarios
                     ajustarTiempoDeFin(horario, tareasSiguienteProyecto, linksSiguienteProyecto, desplazamiento);
+                    // se actualizan los datos de las tareas y el proyecto asignados a dichas tareas en la base de datos.
                     actualizarTareasEnBD(tareasSiguienteProyecto);
                     actualizarDuracionYInicioDeProyecto(tareasSiguienteProyecto);
+                    // se actualizan los usuarios con la información de las tareas del siguiente proyecto actualizadas.
                     actualizarUsuariosConFinDeTareas(tareasSiguienteProyecto, usuarios)
                     
                 }
@@ -112,12 +171,13 @@ async function main() {
 
 
         }
-
+        //cuando ha acabado todo directamente guardamos los datos actualizados de los usuarios en la base de datos
         guardarUsuariosActualizados(usuarios);
         console.log("Finalizado ajuste de tareas por slack");
     }   
 
     async function guardarUsuariosActualizados(usuarios) {
+        // se actualiza usuario a usuario sus tareas en el servidor.
         await Promise.all(
             usuarios.map(user => {
             return db.collection('users').updateOne(
@@ -135,13 +195,18 @@ async function main() {
             if (!tarea.start_date || isNaN(tarea.duration)){ 
                 continue;
             }
+
+            // se toma una tarea que ha visto sus datos y plazos modificados y calculamos su fecha de finalización.
+
             const fechaInicio = new Date(tarea.start_date).getTime();
             const fechaFin = new Date(fechaInicio + tarea.duration * 60000);
             const fechaFinFormateada = format(fechaFin, "yyyy-MM-dd HH:mm");
 
+            // se recorren todos los usuarios
+
             for (const usuario of usuarios) {
                 const pila = usuario.tareas ?? [];
-
+                //se comprueba si la tarea que hemos obtenido está en la pila de ese usuario. si está, se actualiza la fecha en la esta acaba con el nuevo valor.
                 const index = pila.findIndex(meta => meta.pid === pid && meta.tid === tid);
                 if (index !== -1) {
                     usuario.tareas[index].acaba = fechaFinFormateada;
@@ -182,11 +247,15 @@ async function main() {
 
     function getUsuariosConUltimaTareaEnProyecto(pid, usuarios) {
         const usuariosConTarea = [];
-
+        /*
+        Tener en cuenta el formato de la pila de tareas de un usuario, si la pila es en un momento [X,Y,Z], con X la ultima tarea que tiene asignada 
+        (es decir, la tarea que ejecutará mas en el futuro, tenindo por ahora indice 0)
+        si le asignamos una nueva tarea I al usuario, la pila tendrá la forma [I,X,Y,Z] (ahora I tiene indice 0, y X tiene indice 1);
+        */
         usuarios.forEach(user => {
             const tareas = user.tareas ?? [];
             //console.log(`Estas son las tarreas del usuario ${user.uname}:\n${JSON.stringify(tareas, null, 2)}\n`);
-            // Buscar desde el final la última tarea del proyecto pid
+            // Buscamos desde el indice 0 hacia abajo la última tarea del proyecto con pid: pid (es decir, buscamos desde 0, luego en 1, luego en 2...)
             for (let i = 0; i < tareas.length ; i++) {
                 if (tareas[i].pid === pid) {
                     usuariosConTarea.push({
@@ -204,38 +273,67 @@ async function main() {
 
     function ajustarTiempoDeFin(horario, tareasProyecto, linksProyecto, offsetInicio){
         
+
+        //se obtiene la configuración de la jornada
+
         const horaEntrada = horario[0].entrada;
         const horaSalida = horario[0].salida;
         const [hora1, minuto1] = horaEntrada.split(':').map(Number);
         const [hora2, minuto2] = horaSalida.split(':').map(Number);
         const duracionJornada =  (hora2 - hora1) * 60 + (minuto2 - minuto1);
         
-
+        //hacemos un recorrido tarea a tarea
 
         tareasProyecto.forEach(task => {
+
+            const original_slack = task.slack;
+
+            //primero comprobamos si la tarea tiene predecesoras (es decir, hay un link que apunta a la tarea actual como target).
             let IncomingLinks = linksProyecto.filter((link) => link.target === task.id);
-            let startDates= [];
-            let totalSlackOverflow = 0;
+            let startDates = [];
             if(IncomingLinks.length !== 0){
                 IncomingLinks.forEach((linkPredecesor)=>{
                     let taskToAdd = tareasProyecto.find((PredecesorTask) => PredecesorTask.id === linkPredecesor.source );
                     if(taskToAdd !== undefined){
+                        let totalSlackOverflow = 0;
                         const endTime = new Date(taskToAdd.start_date).getTime() + taskToAdd.duration * 60000;
                         totalSlackOverflow += (taskToAdd.slack < taskToAdd.slack_used) ? (taskToAdd.slack_used - taskToAdd.slack) : 0;
-                        startDates.push(new Date(endTime));
+                        startDates.push({end: new Date(endTime), carriageSlack: totalSlackOverflow});
                     }
                 });
             }   
 
+            //Asignamos la fecha de inicio al proyecto, si no hay tareas que la precedan usamos la fecha que tiene la tarea directamente.
+            //Si tiene predecesoras buscamos cual de las fechas está mas en el futuro y la tomamos como fecha de inicio. ademas sumamos a 
+            //esta fecha de inicio el slack overflow, es decir, sabiendo que tenemos tareas predecesoras de la actual, y que ambas tienen un slack used mayor que su slack permitido (slack)
+            //sumamos esa sumatoria de slack_used a la fecha de inicio de la tarea, retrasando su inicio tanto como el slack used.
+
             let taskAdjustedStartDate = task.start_date;
 
+            /*
             if (startDates.length !== 0) {
-                startDates.sort((a, b) => b.getTime() - a.getTime());
-                const startDateWithSlackOverflow = new Date(startDates[0].getTime() + totalSlackOverflow * 60000)
+                startDates.sort((a, b) => b.end.getTime() - a.end.getTime());
+                const startDateWithSlackOverflow = new Date(startDates[0].end.getTime() + startDates[0].carriageSlack * 60000)
                 taskAdjustedStartDate = format(startDateWithSlackOverflow, "yyyy-MM-dd HH:mm");
+            }*/
+
+            if (startDates.length !== 0) {
+                let maxMs = -Infinity;
+                for (const s of startDates) {
+                    const candidate = s.end.getTime() + s.carriageSlack * 60000; 
+                    if (candidate > maxMs) {
+                        maxMs = candidate;
+                    }
+                }
+                taskAdjustedStartDate = format(new Date(maxMs), "yyyy-MM-dd HH:mm");
             }
 
+            //sea cual sea la tarea, lo que hacemos ahora es sumarle el offsetdeInicio (el tiempo hay que retrasar el inicio de la tarea por un solapamiento previo)
+
             let fechaInicioTarea = new Date(new Date(taskAdjustedStartDate).getTime() + offsetInicio);
+            
+            // se ajusta la fecha de inicio para que esta no caiga fuera de jornada laboral ni festivo.
+
             const {horaInicioTarea, minutoInicioTarea} = {horaInicioTarea: fechaInicioTarea.getHours(), minutoInicioTarea: fechaInicioTarea.getMinutes()};
             
             if(horaInicioTarea < hora1 || ((horaInicioTarea === hora1 ) && (minutoInicioTarea < minuto1))){
@@ -248,16 +346,23 @@ async function main() {
                 fechaInicioTarea = new Date(fechaInicioTarea.getTime() + 86400000);
             }
 
-            let fechaFinDirecto = new Date(fechaInicioTarea.getTime() + (task.duration - task.offtime - task.slack_used) * 60000);
+            //se calcula cual debe ser la fecha de fin de una tarea si no hay hay ni contratiempos ni un solo momento fuera de jornada laboral, 
+            // con eso sacamos cuantos tiempos fuera de jornadas se pasa para realizar esa tarea, luego se calcula ademas cuantos sabados y domingos atraviesa el periodo
+            // tras lo cual se calcula la nueva fecha de fin teniendo en cuenta ahora el tiempo fuera de jornada y en fin de semana
+
+            let fechaFinDirecto = new Date(fechaInicioTarea.getTime() + (task.duration - task.offtime /*- task.slack_used*/) * 60000);
 
             let fullJournals = Math.floor(((task.duration - task.offtime  - task.slack_used )/ duracionJornada));
 
             let tiempoFinDeSemana = contarFinesDeSemana(fechaInicioTarea, fechaFinDirecto);
 
             let tiempoFueraDeJornada = tiempoFinDeSemana + fullJournals;
-            let fechaFinConFinesDeSemana = new Date(fechaInicioTarea.getTime() + (task.duration - task.offtime - task.slack_used) * 60000  + tiempoFueraDeJornada * 86400000 );
+            let fechaFinConFinesDeSemana = new Date(fechaInicioTarea.getTime() + (task.duration - task.offtime /*- task.slack_used*/) * 60000  + tiempoFueraDeJornada * 86400000 );
             const horaFin = fechaFinConFinesDeSemana.getHours();
             const minutosFin = fechaFinConFinesDeSemana.getMinutes();
+
+
+            // se comprueba que la fecha de fin nueva no caiga en fin de semana o fuera de jornada laboral, si pasa eso, se añade el tiempo necesario para ajustar el horario
 
 
             let horasExtra = 0;
@@ -280,53 +385,109 @@ async function main() {
                     ++tiempoFueraDeJornada;
                 }
                 
-                const duracionTotal = Math.round((fechaFinConFinesDeSemana.getTime() - fechaInicioTarea.getTime()) / 60000);
-                const duracionReal = task.duration - task.slack_used;
-                
-                const tiempoNoProductivo = duracionTotal - duracionReal;
 
+                const duracionTotal = Math.round((fechaFinConFinesDeSemana.getTime() - fechaInicioTarea.getTime()) / 60000); // = W + OFF_new
+                const duracionProductiva = task.duration - task.offtime - task.slack_used; // = W  (invariante)
+                const offtimeNuevo = duracionTotal - duracionProductiva;                   // = OFF_new (absoluto)
+                
                 task.start_date = format(fechaInicioTarea, "yyyy-MM-dd HH:mm");
-                task.duration = duracionTotal;
-                task.offtime = tiempoNoProductivo;
-
+                task.offtime = offtimeNuevo;                                               // guarda OFF_new, no el delta
+                task.duration = duracionProductiva + offtimeNuevo + task.slack_used; 
+                task.slack = original_slack;
         });
 
 
 
     }
 
-    async function padProyectsSlack(proyect, horario, usuarios){
-        
-        const currentDate = new Date().getTime();
-        
-        
-        let tareasProyecto = await db.collection('tasks').find({pid: proyect.id}).toArray();
-        let linksProyecto = await db.collection('links').find({pid: proyect.id}).toArray()
-        
-        
-        tareasProyecto.forEach(tarea =>{
-            let fechaFinTarea = new Date(tarea.start_date).getTime() + (tarea.duration * 60000);
-            if (currentDate > fechaFinTarea  && tarea.progress < 1){
-                let extraTime = (currentDate - fechaFinTarea)/60000;
-            
-                tarea.duration -= tarea.slack_used
-                tarea.duration += extraTime;
-                tarea.slack_used = extraTime;
-                
+    async function padProyectsSlack(proyect, horario, usuarios, date) {
+        const currentMs = date.getTime(); 
 
-                /*let succesors = findAllSuccesors(tarea, tareasProyecto, linksProyecto);
-                succesors.forEach(succesor =>{
-                    succesor.start_date = format(new Date(new Date(succesor.start_date).getTime() + (timeToAdd * 60000)), "yyyy-MM-dd HH:mm");
-                })*/
+        const tareasProyecto = await db.collection('tasks').find({ pid: proyect.id }).toArray();
+        const linksProyecto  = await db.collection('links').find({ pid: proyect.id }).toArray();
 
+        let proceedFlag = false;
+
+        for (const tarea of tareasProyecto) {
+            if (tarea.progress >= 1) continue; // ya finalizada
+
+            const startMs   = new Date(tarea.start_date).getTime();
+            const offtime   = Number(tarea.offtime)    || 0;
+            const oldSlack  = Number(tarea.slack_used) || 0;
+
+            // W = tiempo productivo puro (sin offtime ni slack)
+            const workTime = tarea.duration - offtime - oldSlack;
+
+            // Fin planificado original = inicio + W + offtime (sin slack)
+            const plannedEndMs = startMs + (workTime + offtime) * 60000;
+
+            if (currentMs > plannedEndMs) {
+                const delayNow = Math.floor((currentMs - plannedEndMs) / 60000);
+
+                if (delayNow > oldSlack) {
+                    const delta = delayNow - oldSlack;
+                    tarea.slack_used = delayNow;
+                    tarea.duration   = workTime + offtime + delayNow; // W + OFF + nuevo slack
+                    proceedFlag = true;
+                }
             }
-        });
-        
+        }
+
         ajustarTiempoDeFin(horario, tareasProyecto, linksProyecto, 0);
-        actualizarTareasEnBD(tareasProyecto);
-        actualizarDuracionYInicioDeProyecto(tareasProyecto);
-        actualizarUsuariosConFinDeTareas(tareasProyecto, usuarios);
+
+        await actualizarTareasEnBD(tareasProyecto);
+        await actualizarDuracionYInicioDeProyecto(tareasProyecto);
+        await actualizarUsuariosConFinDeTareas(tareasProyecto, usuarios);
+
+        return proceedFlag;
     }
+
+    /*async function padProyectsSlack(proyect, horario, usuarios, date){
+        const currentMs = date.getTime(); 
+
+        // tasks & links del proyecto
+        const tareasProyecto = await db.collection('tasks').find({ pid: proyect.id }).toArray();
+        const linksProyecto  = await db.collection('links').find({ pid: proyect.id }).toArray();
+
+        let proceedFlag = false;
+
+        for (const tarea of tareasProyecto) {
+            if (tarea.progress >= 1) continue; // ya finalizada
+
+            const startMs   = new Date(tarea.start_date).getTime();
+            const duration  = Number(tarea.duration)   || 0;
+            const offtime   = Number(tarea.offtime)    || 0; // no lo usamos aquí, pero ayuda a razonar
+            const oldSlack  = Number(tarea.slack_used) || 0;
+
+            // Fin real actual (incluye slack_used y offtime)
+            const endRealMs   = startMs + duration * 60000;
+
+            // Fin planificado vigente = fin real - slack_used
+            const plannedEndMs = endRealMs - oldSlack * 60000;
+
+            // ¿ya deberíamos haber terminado según plan?
+            if (currentMs > plannedEndMs) {
+            const delayNow = Math.floor((currentMs - plannedEndMs) / 60000); // minutos enteros de retraso actual
+
+            if (delayNow > oldSlack) {
+                const delta = delayNow - oldSlack;  // solo lo nuevo que se añade
+                tarea.slack_used = delayNow;        // nunca decrece
+                tarea.duration   = duration + delta; // conserva W: duration = W + offtime + slack_used
+                proceedFlag = true;
+            }
+            }
+        }
+
+        // Recalcula inicios/fines con calendario y propaga según dependencias
+        ajustarTiempoDeFin(horario, tareasProyecto, linksProyecto, 0);
+
+        // Persistencia
+        await actualizarTareasEnBD(tareasProyecto);
+        await actualizarDuracionYInicioDeProyecto(tareasProyecto);
+        await actualizarUsuariosConFinDeTareas(tareasProyecto, usuarios);
+
+        return proceedFlag;
+    }*/
 
     async function actualizarTareasEnBD(tareas) {
     if (!Array.isArray(tareas) || tareas.length === 0) return;
@@ -642,6 +803,68 @@ async function main() {
         } catch (err) {
             console.error('Error insertando batch de tareas:', err);
             return res.status(500).json({ error: 'Error interno al crear tareas en lote' });
+        }
+    });
+
+
+app.post('/tasks/updateBatch', async (req, res) => {
+    const tasks = req.body;
+    if (!Array.isArray(tasks) || tasks.length === 0) {
+        return res.status(400).json({ error: 'Se espera un array no vacío de tareas' });
+    }
+
+    for (const t of tasks) {
+        t.pid = parseInt(t.pid);
+        t.id = parseInt(t.id);
+        if (
+            typeof t.pid        !== 'number' ||
+            typeof t.id         !== 'number' ||
+            typeof t.text       !== 'string' ||
+            typeof t.start_date !== 'string' ||
+            typeof t.duration   !== 'number' ||
+            typeof t.details    !== 'string' ||
+            typeof t.slack      !== 'number' || // se valida que exista, pero no se usa en update
+            typeof t.slack_used !== 'number' ||
+            typeof t.offtime    !== 'number' ||
+            typeof t.progress   !== 'number' ||
+            !Array.isArray(t.users)
+        ) {
+            return res.status(400).json({
+                error: 'Cada tarea debe tener pid(number), id(number), text(string), start_date(string), duration(number), details(string), slack(number), slack_used(number), offtime(number), progress(number), users(array)'
+            });
+        }
+    }
+
+    try {
+        const toUpdate = tasks.map(t => ({
+            pid:        t.pid,
+            id:         t.id,
+            text:       t.text,
+            start_date: t.start_date,
+            duration:   t.duration,
+            details:    t.details ?? "",
+            offtime:    t.offtime,
+            // slack: t.slack,   <-- INTENCIONALMENTE OMITIDO
+            slack_used: t.slack_used,
+            progress:   t.progress,
+            users:      t.users
+        }));
+
+        await Promise.all(
+            toUpdate.map(t =>
+                db.collection('tasks').updateOne(
+                    { pid: t.pid, id: t.id },
+                    { $set: t }
+                )
+            )
+        );
+
+        return res.status(200).json({
+            updatedCount: toUpdate.length
+        });
+        } catch (err) {
+            console.error('Error actualizando batch de tareas:', err);
+            return res.status(500).json({ error: 'Error interno al actualizar tareas en lote' });
         }
     });
 

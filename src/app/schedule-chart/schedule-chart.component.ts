@@ -43,6 +43,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
   private route: ActivatedRoute = inject(ActivatedRoute);
   private router: Router = inject(Router);
   private cookie: CookieService = inject(CookieService)
+  private saveFlag: boolean = true;
 
   private id = this.route.snapshot.queryParams['id'];  
   private mode: string = this.route.snapshot.queryParams['title'];
@@ -55,6 +56,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
   @ViewChild('proyectName') proyectNameField!: ElementRef;
 
   @ViewChild('ganttContainer', { static: true }) ganttContainer!: ElementRef;
+  
 
   async ngAfterViewInit(): Promise<void> {
 
@@ -379,7 +381,11 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     const name = (this.proyectNameField.nativeElement as HTMLInputElement).value;
 
     if(this.mode === "verProyecto"){
-          if(name && this.id){
+      const operation: string = this.route.snapshot.queryParams['operation'];
+      if(operation === "actualizar"){
+        this.saveFlag = false;
+      }
+          if(name && this.id && operation.length > 0){
 
       const content = gantt.serialize();
         try {
@@ -392,8 +398,26 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
           await this.dbDao.deleteProyectByPidPromise(element.id);
 
           await this.dbDao.createProyect(element);
+          
+            if(operation === "guardar" && this.saveFlag){
+              await this.dbDao.deleteAllByPidPromise(this.id);
+              await this.dbDao.SaveProyectTasksandLinks(
+                this.id,
+                content.data,
+                content.links
+              );
+              this.saveFlag = false;
+              //console.log("guardar");
+            }else if(operation === "actualizar" || !this.saveFlag){
+              await this.dbDao.updateProyectTasks(
+                this.id,
+                content.data,
+                content.links
+              );
+              //console.log("actualizar");
+            }
 
-          await this.dbDao.deleteAllByPidPromise(this.id);
+          
           
           //console.log("tareas que se envían al DAO",this.id, content.data, content.links);
 
@@ -401,11 +425,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
             console.log(values['slack']);
           });*/
 
-          await this.dbDao.SaveProyectTasksandLinks(
-            this.id,
-            content.data,
-            content.links
-          );
+          
           
         } catch (err) {
           console.error('Error al subir cambios:', err);

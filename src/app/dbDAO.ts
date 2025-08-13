@@ -175,6 +175,21 @@ export class dbDAO {
 
   }
 
+  public async updateProyectTasks(pid: number, tasks: any[], rels:  any[]): Promise<void> {
+    const cleanTasks = tasks;
+  
+    //console.log("tareas antes de procesarlas: ", tasks);
+    
+    const tasksWithPid: Task[] = cleanTasks.map(t => ({ ...t, pid }));
+
+    //console.log("tareas despues de procesarlas: ", tasksWithPid);
+
+    // 2) Ejecutar ambos batch en paralelo y esperar resultados
+    if(tasksWithPid.length !== 0){
+      const taskRes = await lastValueFrom(this.updateTasksBatch(tasksWithPid));
+    }
+  }
+
   public async createProyect(proyect: Proyect): Promise<void> {
   
     await lastValueFrom(
@@ -188,6 +203,13 @@ export class dbDAO {
   public createTasksBatch(tasks: Task[]): Observable<number> {
     return this.http.post<number>(
       `http://localhost:3000/tasks/batch`,
+      tasks
+    );
+  }
+
+    public updateTasksBatch(tasks: Task[]): Observable<number> {
+    return this.http.post<number>(
+      `http://localhost:3000/tasks/updateBatch`,
       tasks
     );
   }

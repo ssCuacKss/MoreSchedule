@@ -395,7 +395,7 @@ export class ScheduleCalendarComponent implements OnInit{
 
   public goToProyectSchedule(event: CalendarEvent): void {
 
-    this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: event.id, name: event.title}});
+    this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: event.id, name: event.title, operation: "actualizar"}});
 
   }
 
@@ -790,7 +790,7 @@ export class ScheduleCalendarComponent implements OnInit{
       await this.dbDao.createProyect(ProyectToSave);
       this.events = [...this.events, calendarEvent];
       //console.log(this.events);
-      this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: ProyectToSave.id, name: ProyectToSave.title}});
+      this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: ProyectToSave.id, name: ProyectToSave.title, operation: "guardar"}});
     }
 
   }
@@ -969,7 +969,7 @@ export class ScheduleCalendarComponent implements OnInit{
 
     this.events.push(calendarEvent);
     this.events = [...this.events];
-    this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: ProyectToSave.id, name: ProyectToSave.title}});
+    this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: ProyectToSave.id, name: ProyectToSave.title, operation: "guardar"}});
 
     }
     else{
