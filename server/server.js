@@ -34,7 +34,7 @@ async function main() {
 
         //Se obtine la fecha actual y la configuración del horario.
         //const currentDate = new Date();
-        const currentDate = new Date("2025-08-14 13:00");
+        const currentDate = new Date("2025-08-15 11:50");
 
         let horario = await db.collection('calendarConfig').find().toArray();
 
@@ -54,7 +54,7 @@ async function main() {
             const endTime = startTime + proyect.end * 3600000;
             //currentDate.getTime() <= (new Date(proyect.start).getTime() + ( proyect.end * 3600000))
 
-            return startTime <= currentDate && currentDate <= endTime;
+            return startTime <= currentDate && currentDate <= (endTime + (2*MINUTES_INTERVAL*60000));
         });
         
         // se ordenan ambos tipos de filtración de fecha de inicio mas próxima a fecha de inicio mas en el futuro (menor a mayor)
@@ -272,6 +272,148 @@ async function main() {
     }
 
     function ajustarTiempoDeFin(horario, tareasProyecto, linksProyecto, offsetInicio){
+
+    const horaEntrada = horario[0].entrada;
+    const horaSalida  = horario[0].salida;
+    const [hora1, minuto1] = horaEntrada.split(':').map(Number);
+    const [hora2, minuto2] = horaSalida.split(':').map(Number);
+    const duracionJornada  = (hora2 - hora1) * 60 + (minuto2 - minuto1);
+    
+    tareasProyecto.forEach(task => {
+
+        const original_slack = task.slack;
+        const W_original = task.duration - task.offtime - task.slack_used; // W antes de tocar nada
+
+        // --- Inicio calculado por predecesoras (igual que tienes) ---
+        let IncomingLinks = linksProyecto.filter((link) => link.target === task.id);
+        let startDates = [];
+        if (IncomingLinks.length !== 0) {
+            IncomingLinks.forEach((linkPredecesor) => {
+                let taskToAdd = tareasProyecto.find((PredecesorTask) => PredecesorTask.id === linkPredecesor.source);
+                if (taskToAdd !== undefined) {
+                    const endTime = new Date(taskToAdd.start_date).getTime() + taskToAdd.duration * 60000;
+                    startDates.push(new Date(endTime));
+                }
+            });
+        }
+
+        let taskAdjustedStartDate = task.start_date;
+        if (startDates.length !== 0) {
+            let maxMs = -Infinity;
+            for (const s of startDates) {
+                const candidate = s.getTime();
+                if (candidate > maxMs) maxMs = candidate;
+            }
+            taskAdjustedStartDate = format(new Date(maxMs), "yyyy-MM-dd HH:mm");
+        }
+
+        // --- Ajuste de inicio a jornada ---
+        let fechaInicioTarea = new Date(new Date(taskAdjustedStartDate).getTime() + offsetInicio);
+        const horaInicioTarea = fechaInicioTarea.getHours();
+        const minutoInicioTarea = fechaInicioTarea.getMinutes();
+
+        if (horaInicioTarea < hora1 || ((horaInicioTarea === hora1) && (minutoInicioTarea < minuto1))) {
+            fechaInicioTarea.setHours(hora1, minuto1);
+        } else if (horaInicioTarea > hora2 || ((horaInicioTarea === hora2) && (minutoInicioTarea >= minuto2))) {
+            fechaInicioTarea.setHours(hora1, minuto1);
+            fechaInicioTarea = new Date(fechaInicioTarea.getTime() + 86400000);
+        }
+        while (isSaturday(fechaInicioTarea) || isSunday(fechaInicioTarea)) {
+            fechaInicioTarea = new Date(fechaInicioTarea.getTime() + 86400000);
+        }
+
+        // --- Fin solo con W_original (tu lógica tal cual) ---
+        let fechaFinDirecto = new Date(fechaInicioTarea.getTime() + W_original * 60000);
+        let fullJournals    = Math.floor(W_original / duracionJornada);
+        let tiempoFinDeSemana = contarFinesDeSemana(fechaInicioTarea, fechaFinDirecto);
+
+        let tiempoFueraDeJornada = tiempoFinDeSemana + fullJournals;
+        let fechaFinConFinesDeSemana = new Date(fechaInicioTarea.getTime() + W_original * 60000 + (tiempoFueraDeJornada * 86400000));
+        const horaFin    = fechaFinConFinesDeSemana.getHours();
+        const minutosFin = fechaFinConFinesDeSemana.getMinutes();
+
+        let horasExtra = 0;
+        let minutosExtra = 0;
+
+        if (horaFin > hora2 || (horaFin === hora2 && (minutosFin > minuto2))) {
+            fechaFinConFinesDeSemana.setHours(hora1, minuto1);
+            fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + 86400000);
+            ++tiempoFueraDeJornada;
+            horasExtra   = horaFin - hora2;
+            minutosExtra = minutosFin - minuto2;
+        }
+
+        let timeToAdd = (horasExtra * 60 + minutosExtra) * 60000;
+        tiempoFueraDeJornada += ((horasExtra + minutosExtra / 60) / 24);
+        fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + timeToAdd);
+
+        while (isSaturday(fechaFinConFinesDeSemana) || isSunday(fechaFinConFinesDeSemana)) {
+            fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + 86400000);
+            ++tiempoFueraDeJornada;
+        }
+
+        // offtime con W_original
+        const duracionTotalSoloW = Math.round((fechaFinConFinesDeSemana.getTime() - fechaInicioTarea.getTime()) / 60000);
+        const offtimeNuevo = duracionTotalSoloW - W_original;
+
+        // Guardamos provisional (antes del slack)
+        task.start_date = format(fechaInicioTarea, "yyyy-MM-dd HH:mm");
+        task.offtime    = offtimeNuevo;
+        task.duration   = W_original + offtimeNuevo + task.slack_used;
+
+        // ================================
+        // SEGUNDA NORMALIZACIÓN (clave)
+        // Ajustar si al sumar slack_used el fin cae fuera de jornada o en fin de semana
+        // ================================
+        const finConSlackProvisional = new Date(
+            fechaInicioTarea.getTime() + (W_original + offtimeNuevo + task.slack_used) * 60000
+        );
+
+        let finNormalizado = new Date(finConSlackProvisional);
+
+        // Repetimos la misma lógica de corte de jornada, con posibilidad de varias iteraciones
+        while (true) {
+            const h = finNormalizado.getHours();
+            const m = finNormalizado.getMinutes();
+
+            // Si se pasa del fin de jornada, saltamos al día siguiente a la hora de entrada y añadimos el "resto"
+            if (h > hora2 || (h === hora2 && m > minuto2)) {
+                const restoMin = (h - hora2) * 60 + (m - minuto2); // minutos que "sobran" ese día
+                finNormalizado.setHours(hora1, minuto1);
+                finNormalizado = new Date(finNormalizado.getTime() + 86400000 + restoMin * 60000);
+                continue; // re-chequear por si aún cae fuera
+            }
+
+            // Si cae en fin de semana, saltamos al siguiente día laborable a primera hora
+            if (isSaturday(finNormalizado) || isSunday(finNormalizado)) {
+                do {
+                    finNormalizado = new Date(finNormalizado.getTime() + 86400000);
+                } while (isSaturday(finNormalizado) || isSunday(finNormalizado));
+                finNormalizado.setHours(hora1, minuto1);
+                continue; // re-chequear por si vuelve a pasarse del horario ese mismo día
+            }
+
+            break; // ya está normalizado
+        }
+
+        // Minutos extra añadidos por normalizar con slack (fuera de jornada / fin de semana)
+        const extraPorNormalizar = Math.round(
+            (finNormalizado.getTime() - finConSlackProvisional.getTime()) / 60000
+        );
+
+        // Actualizamos offtime y duración definitivos
+        task.offtime  = offtimeNuevo + extraPorNormalizar;
+        task.duration = W_original + task.slack_used + task.offtime;
+
+        // Blindaje: no tocar slack
+        task.slack = original_slack;
+    });
+}
+
+
+
+    /*
+    function ajustarTiempoDeFin(horario, tareasProyecto, linksProyecto, offsetInicio){
         
 
         //se obtiene la configuración de la jornada
@@ -310,13 +452,6 @@ async function main() {
 
             let taskAdjustedStartDate = task.start_date;
 
-            /*
-            if (startDates.length !== 0) {
-                startDates.sort((a, b) => b.end.getTime() - a.end.getTime());
-                const startDateWithSlackOverflow = new Date(startDates[0].end.getTime() + startDates[0].carriageSlack * 60000)
-                taskAdjustedStartDate = format(startDateWithSlackOverflow, "yyyy-MM-dd HH:mm");
-            }*/
-
             if (startDates.length !== 0) {
                 let maxMs = -Infinity;
                 for (const s of startDates) {
@@ -350,14 +485,14 @@ async function main() {
             // con eso sacamos cuantos tiempos fuera de jornadas se pasa para realizar esa tarea, luego se calcula ademas cuantos sabados y domingos atraviesa el periodo
             // tras lo cual se calcula la nueva fecha de fin teniendo en cuenta ahora el tiempo fuera de jornada y en fin de semana
 
-            let fechaFinDirecto = new Date(fechaInicioTarea.getTime() + (task.duration - task.offtime /*- task.slack_used*/) * 60000);
+            let fechaFinDirecto = new Date(fechaInicioTarea.getTime() + (task.duration - task.offtime - task.slack_used) * 60000);
 
             let fullJournals = Math.floor(((task.duration - task.offtime  - task.slack_used )/ duracionJornada));
 
             let tiempoFinDeSemana = contarFinesDeSemana(fechaInicioTarea, fechaFinDirecto);
 
             let tiempoFueraDeJornada = tiempoFinDeSemana + fullJournals;
-            let fechaFinConFinesDeSemana = new Date(fechaInicioTarea.getTime() + (task.duration - task.offtime /*- task.slack_used*/) * 60000  + tiempoFueraDeJornada * 86400000 );
+            let fechaFinConFinesDeSemana = new Date(fechaInicioTarea.getTime() + (task.duration - task.offtime - task.slack_used) * 60000  + (tiempoFueraDeJornada * 86400000));
             const horaFin = fechaFinConFinesDeSemana.getHours();
             const minutosFin = fechaFinConFinesDeSemana.getMinutes();
 
@@ -368,38 +503,70 @@ async function main() {
             let horasExtra = 0;
             let minutosExtra = 0;
 
-                if(horaFin > hora2 || (horaFin === hora2 && (minutosFin > minuto2))){
-                    fechaFinConFinesDeSemana.setHours(hora1, minuto1);
-                    fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + 86400000);
-                    ++tiempoFueraDeJornada;
-                    horasExtra = horaFin - hora2;
-                    minutosExtra = minutosFin - minuto2;
-                }
+            if(horaFin > hora2 || (horaFin === hora2 && (minutosFin > minuto2))){
+                fechaFinConFinesDeSemana.setHours(hora1, minuto1);
+                fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + 86400000);
+                ++tiempoFueraDeJornada;
+                horasExtra = horaFin - hora2;
+                minutosExtra = minutosFin - minuto2;
+            }
 
-                let timeToAdd = (horasExtra * 60 + minutosExtra) * 60000 ;
-                tiempoFueraDeJornada += ((horasExtra + minutosExtra / 60)/24);
-                fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + timeToAdd);
-                
-                while(isSaturday(fechaFinConFinesDeSemana) || isSunday(fechaFinConFinesDeSemana)){
-                    fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + 86400000);
-                    ++tiempoFueraDeJornada;
-                }
-                
+            let timeToAdd = (horasExtra * 60 + minutosExtra) * 60000 ;
+            tiempoFueraDeJornada += ((horasExtra + minutosExtra / 60)/24);
+            fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + timeToAdd);
+            
+            while(isSaturday(fechaFinConFinesDeSemana) || isSunday(fechaFinConFinesDeSemana)){
+                fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + 86400000);
+                ++tiempoFueraDeJornada;
+            }
+            
 
-                const duracionTotal = Math.round((fechaFinConFinesDeSemana.getTime() - fechaInicioTarea.getTime()) / 60000); // = W + OFF_new
-                const duracionProductiva = task.duration - task.offtime - task.slack_used; // = W  (invariante)
-                const offtimeNuevo = duracionTotal - duracionProductiva;                   // = OFF_new (absoluto)
-                
-                task.start_date = format(fechaInicioTarea, "yyyy-MM-dd HH:mm");
-                task.offtime = offtimeNuevo;                                               // guarda OFF_new, no el delta
-                task.duration = duracionProductiva + offtimeNuevo + task.slack_used; 
-                task.slack = original_slack;
+            const duracionTotal = Math.round((fechaFinConFinesDeSemana.getTime() - fechaInicioTarea.getTime()) / 60000); // = W + OFF_new
+            const duracionProductiva = task.duration - task.offtime - task.slack_used; // = W  (invariante)
+            const offtimeNuevo = duracionTotal - duracionProductiva;                   // = OFF_new (absoluto)
+            
+            task.start_date = format(fechaInicioTarea, "yyyy-MM-dd HH:mm");
+            task.offtime = offtimeNuevo;                                               // guarda OFF_new, no el delta
+            let finalDuration = duracionProductiva + offtimeNuevo + task.slack_used; 
+            
+            let horasAdd = 0;
+            let minutosAdd = 0;
+            
+            let moreTimeToAdd = 0;
+
+            let fechaFinCompleta = new Date(new Date(task.start_date).getTime() + task.duration * 60000);
+            
+            let horasFinCompleta = fechaFinCompleta.getHours()
+            let minutosFinCompletos = fechaFinCompleta.getMinutes();
+
+            if(horasFinCompleta > hora2 || (horasFinCompleta === hora2 && (minutosFinCompletos > minuto2))){
+                fechaFinCompleta.setHours(hora1, minuto1);
+                fechaFinCompleta = new Date(fechaFinCompleta.getTime() + 86400000);
+                ++moreTimeToAdd;
+                horasAdd = horasFinCompleta - hora2;
+                minutosAdd = minutosFinCompletos - minuto2;
+            }
+
+            let secondTimeToAdd = (horasAdd * 60 + minutosAdd) * 60000 ;
+            moreTimeToAdd += ((horasAdd + minutosAdd / 60)/24);
+            fechaFinCompleta = new Date(fechaFinConFinesDeSemana.getTime() + secondTimeToAdd);
+            
+            while(isSaturday(fechaFinConFinesDeSemana) || isSunday(fechaFinConFinesDeSemana)){
+                fechaFinCompleta = new Date(fechaFinConFinesDeSemana.getTime() + 86400000);
+                ++moreTimeToAdd;
+            }
+            task.offtime = offtimeNuevo + moreTimeToAdd;
+
+            task.duration = finalDuration + moreTimeToAdd;
+            
+            task.slack = original_slack;
         });
 
 
 
-    }
+    }*/
 
+        /*
     async function padProyectsSlack(proyect, horario, usuarios, date) {
         const currentMs = date.getTime(); 
 
@@ -440,12 +607,11 @@ async function main() {
         await actualizarUsuariosConFinDeTareas(tareasProyecto, usuarios);
 
         return proceedFlag;
-    }
+    }*/
 
-    /*async function padProyectsSlack(proyect, horario, usuarios, date){
+    async function padProyectsSlack(proyect, horario, usuarios, date) {
         const currentMs = date.getTime(); 
 
-        // tasks & links del proyecto
         const tareasProyecto = await db.collection('tasks').find({ pid: proyect.id }).toArray();
         const linksProyecto  = await db.collection('links').find({ pid: proyect.id }).toArray();
 
@@ -455,40 +621,36 @@ async function main() {
             if (tarea.progress >= 1) continue; // ya finalizada
 
             const startMs   = new Date(tarea.start_date).getTime();
-            const duration  = Number(tarea.duration)   || 0;
-            const offtime   = Number(tarea.offtime)    || 0; // no lo usamos aquí, pero ayuda a razonar
+            const offtime   = Number(tarea.offtime)    || 0;
             const oldSlack  = Number(tarea.slack_used) || 0;
 
-            // Fin real actual (incluye slack_used y offtime)
-            const endRealMs   = startMs + duration * 60000;
+            // === Igual que W_original en ajustarTiempoDeFin ===
+            const workTime = tarea.duration - offtime - oldSlack; 
 
-            // Fin planificado vigente = fin real - slack_used
-            const plannedEndMs = endRealMs - oldSlack * 60000;
+            // Fin planificado original (sin slack usado)
+            const plannedEndMs = startMs + (workTime + offtime) * 60000;
 
-            // ¿ya deberíamos haber terminado según plan?
             if (currentMs > plannedEndMs) {
-            const delayNow = Math.floor((currentMs - plannedEndMs) / 60000); // minutos enteros de retraso actual
+                const delayNow = Math.floor((currentMs - plannedEndMs) / 60000);
 
-            if (delayNow > oldSlack) {
-                const delta = delayNow - oldSlack;  // solo lo nuevo que se añade
-                tarea.slack_used = delayNow;        // nunca decrece
-                tarea.duration   = duration + delta; // conserva W: duration = W + offtime + slack_used
-                proceedFlag = true;
+                if (delayNow > oldSlack) {
+                    tarea.slack_used = delayNow;
+                    tarea.duration   = workTime + offtime + delayNow; // coherente con ajustarTiempoDeFin
+                    proceedFlag = true;
+                }
             }
-            }
-        }
+    }
 
-        // Recalcula inicios/fines con calendario y propaga según dependencias
-        ajustarTiempoDeFin(horario, tareasProyecto, linksProyecto, 0);
+    // recalcula inicios y fines con la nueva duración
+    ajustarTiempoDeFin(horario, tareasProyecto, linksProyecto, 0);
 
-        // Persistencia
-        await actualizarTareasEnBD(tareasProyecto);
-        await actualizarDuracionYInicioDeProyecto(tareasProyecto);
-        await actualizarUsuariosConFinDeTareas(tareasProyecto, usuarios);
+    await actualizarTareasEnBD(tareasProyecto);
+    await actualizarDuracionYInicioDeProyecto(tareasProyecto);
+    await actualizarUsuariosConFinDeTareas(tareasProyecto, usuarios);
 
-        return proceedFlag;
-    }*/
-
+    return proceedFlag;
+}
+    
     async function actualizarTareasEnBD(tareas) {
     if (!Array.isArray(tareas) || tareas.length === 0) return;
 
