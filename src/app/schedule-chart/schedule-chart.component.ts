@@ -110,12 +110,18 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
     gantt.config.drag_resize = true;
     gantt.config.drag_move = true;
+    gantt.config.drag_links = true;
 
     gantt.config.scales = [
-      { unit: 'day',  step: 1, format: '%d %M' },
-      { unit: 'hour', step: 1, format: '%H:%i' },
-      
-    ];
+  {
+    unit: "day",
+    step: 1,
+    format: date => {
+      return "Día " + (Math.ceil((gantt.columnIndexByDate(date))/24) + 1);
+    }
+  },
+  { unit: "hour", step: 1, format: "%H:%i" }
+];
 
     gantt.config.scale_height = 50;
     gantt.config.min_column_width = 45;
@@ -207,9 +213,10 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
   }
 
   private async initateGanttForViewProyect(){    
-   
 
-    gantt.attachEvent('onLightbox', taskId => {
+    gantt.attachEvent('onLinkDblClick', () => false);
+
+    gantt.attachEvent('onLightbox', taskId => { 
       const task = gantt.getTask(taskId);
       const userCount = task["users"].length;
       //console.log(userCount);
@@ -223,6 +230,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
         }
       });
       
+    
   
       //console.log(operarioLabels);
       let taskCounter = 0;
@@ -263,7 +271,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
     gantt.config.drag_resize = false;
     gantt.config.drag_move = false;
-
+    gantt.config.drag_links = false;
     gantt.config.end_date   = gantt.date.add(gantt.config.start_date, 31, 'day');
 
     gantt.config.scales = [
@@ -279,16 +287,17 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     gantt.config.duration_step = 1;
     gantt.config.time_step = 5;
     gantt.config.round_dnd_dates = false;
-    gantt.config.min_duration    = 1 * 60 * 1000;
+    gantt.config.min_duration = 1 * 60 * 1000;
 
     gantt.config.columns= [
-      {name: "text", label: "Titulo", align: "center"},
-      {name: "add", label: ''}
+      {name: "text", label: "Titulo", align: "left", width: 150},
+      {name: "slack", label: "holgura (mins)", align: "center", width: 120},
+      {name: "slack_used", label: "holgura usada (mins)", align: "center", width: 145}
     ];
 
 
     gantt.config.lightbox.sections = [
-      { name: 'Nombre', type: 'textarea', map_to: 'text', height: 35, focus: true },
+      { name: 'Nombre', type: 'textarea', map_to: 'text', height: 35, focus: true},
       {
         name: 'Periodo',
         type: 'duration',

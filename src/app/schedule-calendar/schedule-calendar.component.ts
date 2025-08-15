@@ -1,5 +1,5 @@
 import { Component, ElementRef, inject, LOCALE_ID, OnInit, ViewChild } from '@angular/core';
-import { CalendarDateFormatter, CalendarEvent, CalendarModule, CalendarMonthViewDay } from 'angular-calendar';
+import { CalendarDateFormatter, CalendarEvent, CalendarModule, CalendarMonthViewDay, CalendarMonthViewBeforeRenderEvent} from 'angular-calendar';
 import { SchedulerDateFormatter, SchedulerModule } from 'angular-calendar-scheduler';
 import { addHours, addMonths, subMonths, isSameMonth, isSameDay, format, add, addMinutes, isSaturday, isSunday} from 'date-fns';
 import { Router } from '@angular/router';
@@ -357,7 +357,9 @@ export class ScheduleCalendarComponent implements OnInit{
         return plantillas;
       });
 
-      this.downloadEvents();
+      let downloadedEvents = await this.downloadEvents();
+      await this.initiateGraphicCues(downloadedEvents);
+      this.events = downloadedEvents;
       this.calendarConfigData = await this.dbDao.GetCalendarConfig().then((config: CalendarConfig) => {
         return config;
       });
@@ -369,7 +371,7 @@ export class ScheduleCalendarComponent implements OnInit{
 
   async downloadEvents(){
     let dbproyects = await this.dbDao.GetProyects();
-    this.events = dbproyects ?? [];
+    return dbproyects ?? [];
   }
 
   previousMonth(): void {
@@ -397,6 +399,31 @@ export class ScheduleCalendarComponent implements OnInit{
 
     this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: event.id, name: event.title, operation: "actualizar"}});
 
+  }
+
+  private async initiateGraphicCues(proyects: CalendarEvent[]){
+
+    const currentDate = new Date();
+    for (let event of proyects){
+      let id: number = event.id as number;
+      let warn = false;
+      let block = false;
+
+      let tasks: Task[] = await this.dbDao.GetProyectTasks(id).then((tasksDB:Task[]) => {return tasksDB});
+      for(let task of tasks){
+        const endDate = new Date(new Date(task.start_date).getTime() + (task.duration * 60000));
+        
+        if(task.slack_used > 0 && task.progress < 1 && this.proyectStatus !== "Retrasado" ){
+          warn = true;
+        }
+        if(task.slack < task.slack_used || endDate < currentDate){
+          block = true;
+          break;
+        }
+      }
+      const prefix = block ? '⛔' : (warn ? '⚠️' : '');
+      event.title = prefix + event.title;
+    }
   }
 
   public openMenu(event: Event): void{
