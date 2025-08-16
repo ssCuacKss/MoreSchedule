@@ -1,3 +1,10 @@
 body{
     margin: 0;
 }
+.cal-month-view .cal-day-cell:has(.cal-event[title*="⛔"]) .cal-day-badge::after {
+  content: " ⛔";
+}
+
+.cal-month-view .cal-day-cell:not(:has(.cal-event[title*="⛔"])):has(.cal-event[title*="⚠️"]) .cal-day-badge::after {
+  content: " ⚠️";
+}

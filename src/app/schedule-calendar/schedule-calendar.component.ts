@@ -47,7 +47,7 @@ import { CookieService } from 'ngx-cookie-service';
             </ul>
           </li>
           <li (click)="selectOption('CalendarConfig')" class="item" id="menu-four">Calendario</li>
-          <li (click)="cerrarSesion()" class="item" id="menu-five">Cerrar Sesión</li>
+          <li (click)="selectOption('CerrarSesion')" class="item" id="menu-five">Cerrar Sesión</li>
         </ul>
       </div>
       <div class="calendar-controls" #buttons>
@@ -59,21 +59,50 @@ import { CookieService } from 'ngx-cookie-service';
       </div>
       <div style="padding: 1rem;" class="calendar" #calendar>
         <mwl-calendar-month-view 
-            [viewDate]="viewDate"
-            [events]="events"
-            (eventClicked)="goToProyectSchedule($event.event)"
-            (dayClicked)="ampliarDia($event.day)"
-            [activeDayIsOpen]="activeDayIsOpen"
-            [eventActionsTemplate]="eventActionsTpl"/>     
+          [viewDate]="viewDate"
+          [events]="events"
+          (eventClicked)="goToProyectSchedule($event.event)"
+          (dayClicked)="ampliarDia($event.day)"
+          [activeDayIsOpen]="activeDayIsOpen"
+          [eventActionsTemplate]="eventActionsTpl"
+          (beforeViewRender)="beforeMonthViewRender($event)"/>
       </div>
     </div>
     
+    <ng-template #eventActionsTpl let-event="event" >
+        <span id="eventActions">
+          <button class="removeProyectButton" id="removeProyect" mwlCalendarAction="delete">
+            X
+          </button>
+          <label id="removeProyectHolder" for="removeProyectImg">
+            <img id="removeProyectImg" src="https://external-content.duckduckgo.com/iu/?u=http%3A%2F%2Fpluspng.com%2Fimg-png%2Fdelete-button-png-delete-icon-1600.png&f=1&nofb=1&ipt=4dabcc6436bdc1eb053d319c244bb71bc1f21238a165543478c5f69b8d1e7a6f" alt="delete button" (click)="eraseProyect(event)">
+          </label>
+          <button  id="viewProyectSummaryButton">
+          </button>
+          <label id="viewSummaryHolder">
+            <img src="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fwww.pngplay.com%2Fwp-content%2Fuploads%2F7%2FChecklist-Logo-Transparent-Image.png&f=1&nofb=1&ipt=503af8392e5e616fdbdc39e84653915bb17e4ff84330a1004d78c9277331916c" id=viewProyectSummaryImg alt="listIconSummary" width="500" height="600" (click)="getProyectData(event); selectOption('ViewSummary')">
+          </label>
+        </span>
+    </ng-template>
+
+    <div class="dialogDisabled" #dialog>
+      <div class="configHeader">    
+      <h1 style="margin-left: 20px;">Advertencia</h1>
+      <button class="closeButton" (click)="cancelAction()">Cancelar</button>
+      </div>
+      <h4 style="margin-left: 25px; margin-right:25px">{{confirmDLG}}</h4>
+      <div id="optionsCerrarSesion">
+        <input type="button" value="Aceptar" id="closeSessionButton" style="margin: 20px;" (click)="performAction()">
+      </div>
+    </div>
+
     <div class="configDisabled" #config>
+    
       
       <ng-container [ngSwitch]="configOption" >
         <div class="configHeader">
           <h1 class="windowName" #windowName>Sample Text</h1>
-          <button class="closeButton" disabled #closeButton (click)="enableView()">Cancelar</button>
+          <button class="closeButton" #closeButton (click)="enableView()">Cancelar</button>
         </div>
         <div class="configBody">
           <div *ngSwitchCase="'CalendarConfig'">
@@ -97,7 +126,17 @@ import { CookieService } from 'ngx-cookie-service';
           <div *ngSwitchCase="'ViewSummary'">
             <ng-container *ngTemplateOutlet="viewSummary"/>
           </div>
+          <div *ngSwitchCase="'CerrarSesion'">
+            <ng-container *ngTemplateOutlet="cerrarSesion"/>
+          </div>
         </div>
+        <ng-template #cerrarSesion>
+          <h3>{{"Estás a punto de cerrar sesión. ¿Estás seguro?"}}</h3>
+          <div id="optionsCerrarSesion">
+            <input type="button" value="Aceptar" id="closeSessionButton" (click)="actionCerrarSesion()">
+          </div>
+        </ng-template>
+
         <ng-template #viewSummary>
           <h3>{{calendarEventDatos?.title}}</h3>
           <div id="proyectDataHeaders">
@@ -240,9 +279,9 @@ import { CookieService } from 'ngx-cookie-service';
       <ng-template #newProyect>
       <h3>Plantillas</h3>
         <div class="listSelect">
-              <div class="templateSelect" *ngFor="let plantilla of plantillas; index as i">
+              <div class="templateSelect" *ngFor="let plantilla of plantillas; index as i" [class.selectedTemplate]="plantillaElegida?.id === plantilla.id">
                   <h4>{{plantilla.title}}</h4>
-                  <input type="button" value="Usar Plantilla" id="editar" (click)="elegirPlantilla(plantilla)">
+                  <input type="button" value="Usar Plantilla" id="editar" (click)="elegirPlantilla(plantilla, $event, i)">
               </div>
         </div>
         <div class="dateStartSelector">
@@ -250,6 +289,7 @@ import { CookieService } from 'ngx-cookie-service';
           <label for="autoDate">selección de fecha automática</label>
           <input type="datetime-local" #NPDateStart>
         </div>
+        <div class="hidden" #errorMessageCreateProyect style="width: 96%;"></div>
         <div id="quantity">
           <input type="button" id="quantitySelector" #proyectAddFromTemplate value="Crear Proyecto" (click)="parsearPlantilla()">
         </div>
@@ -271,23 +311,6 @@ import { CookieService } from 'ngx-cookie-service';
           <input type="button" id="iniciarProyecto" value="Iniciar Proyecto" (click)="iniciarProyecto()">
         </div>
       </ng-template>
-
-      <ng-template #eventActionsTpl let-event="event" >
-        <span id="eventActions">
-          <button class="removeProyectButton" id="removeProyect" mwlCalendarAction="delete">
-            X
-          </button>
-          <label id="removeProyectHolder" for="removeProyectImg">
-            <img id="removeProyectImg" src="https://external-content.duckduckgo.com/iu/?u=http%3A%2F%2Fpluspng.com%2Fimg-png%2Fdelete-button-png-delete-icon-1600.png&f=1&nofb=1&ipt=4dabcc6436bdc1eb053d319c244bb71bc1f21238a165543478c5f69b8d1e7a6f" alt="delete button" (click)="eraseProyect(event)">
-          </label>
-          <button  id="viewProyectSummaryButton">
-          </button>
-          <label id="viewSummaryHolder">
-            <img src="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fwww.pngplay.com%2Fwp-content%2Fuploads%2F7%2FChecklist-Logo-Transparent-Image.png&f=1&nofb=1&ipt=503af8392e5e616fdbdc39e84653915bb17e4ff84330a1004d78c9277331916c" id=viewProyectSummaryImg alt="listIconSummary" width="500" height="600" (click)="getProyectData(event); selectOption('ViewSummary')">
-          </label>
-        </span>
-      </ng-template>
-
     
   `,
   styleUrl: './schedule-calendar.component.css',
@@ -304,6 +327,7 @@ import { CookieService } from 'ngx-cookie-service';
 })
 export class ScheduleCalendarComponent implements OnInit{
 
+
   public viewDate: Date = new Date();
   public activeDayIsOpen: boolean = false;
   private document: Document = inject(DOCUMENT);
@@ -316,11 +340,14 @@ export class ScheduleCalendarComponent implements OnInit{
   public plantillas!: Plantilla[];
   private users!: User[];
   public usuariosFront!: User[];
-  private plantillaElegida?: Plantilla = undefined;
+  public plantillaElegida?: Plantilla = undefined;
   public calendarEventDatos?: CalendarEvent = undefined;
   public proyectoAResumir: Task[] = [];
   public proyectStatus: string = "";
-  
+  public confirmDLG: string = "";
+  public actionDLG: string = "";
+
+
   @ViewChild("config") private config!: ElementRef;
   @ViewChild("nav") private nav!: ElementRef;
   @ViewChild("buttons") private buttons!: ElementRef;
@@ -334,7 +361,9 @@ export class ScheduleCalendarComponent implements OnInit{
   @ViewChild('NPSPDateStart') private dateStartNPSP!: ElementRef;
   @ViewChild('NPDateStart') private dateStartNPCP!: ElementRef;
   @ViewChild('errorMessage') private errorMessage!: ElementRef;
+  @ViewChild('errorMessageCreateProyect') private errorMessage2!: ElementRef;
   @ViewChild('checkAuto') private checkAuto!: ElementRef;
+  @ViewChild('dialog') private dialog!: ElementRef;
 
   public crearUsuario: FormGroup =  new FormGroup({
     nombre: new FormControl(''),
@@ -350,6 +379,16 @@ export class ScheduleCalendarComponent implements OnInit{
       this.router.navigate(['/'])
     }
     
+  }
+  beforeMonthViewRender(ev: CalendarMonthViewBeforeRenderEvent) {
+    for (const day of ev.body) {
+      const titles = (day.events ?? []).map(e => String(e.title ?? ''));
+
+      const hasBlock = titles.some(t => t.includes('⛔'));
+      const hasWarn  = titles.some(t => t.includes('⚠️'));
+
+      (day as any).emoji = hasBlock ? '⛔' : (hasWarn ? '⚠️' : ''); 
+    }
   }
 
   async ngOnInit(): Promise<void> {
@@ -367,7 +406,9 @@ export class ScheduleCalendarComponent implements OnInit{
       this.users = await this.dbDao.GetUsers().then((users: User[])=>{return users})
       this.usuariosFront = this.users.map(user => ({ ...user }));
       //console.log(this.usuariosFront);
+
     }
+
 
   async downloadEvents(){
     let dbproyects = await this.dbDao.GetProyects();
@@ -424,6 +465,26 @@ export class ScheduleCalendarComponent implements OnInit{
       const prefix = block ? '⛔' : (warn ? '⚠️' : '');
       event.title = prefix + event.title;
     }
+  }
+
+  private dialogResolver?: (v: boolean) => void;
+
+  public async openDialog(msg: string): Promise<boolean> {
+    this.confirmDLG = msg;
+    (this.dialog.nativeElement as HTMLElement).className = 'dialogPanel';
+    return new Promise<boolean>(resolve => (this.dialogResolver = resolve));
+  }
+
+  public cancelAction() {
+    (this.dialog.nativeElement as HTMLElement).className = 'dialogDisabled';
+    this.dialogResolver?.(false);
+    this.dialogResolver = undefined;
+  }
+
+  public performAction() {
+    (this.dialog.nativeElement as HTMLElement).className = 'dialogDisabled';
+    this.dialogResolver?.(true);
+    this.dialogResolver = undefined;
   }
 
   public openMenu(event: Event): void{
@@ -542,6 +603,10 @@ export class ScheduleCalendarComponent implements OnInit{
       case 'ViewSummary':{
         windowName!.textContent = "Resumen de Proyecto";
         break;
+      }
+      case 'CerrarSesion':{
+        windowName!.textContent = "Advertencia";
+        break;
       } 
       default: {
         windowName!.textContent = "NoOPT";
@@ -556,10 +621,10 @@ export class ScheduleCalendarComponent implements OnInit{
     const buttons = this.buttons.nativeElement as HTMLElement;
     const config = this.config.nativeElement as HTMLElement;
     const closeButton = this.closeButton.nativeElement as HTMLElement;
-    
 
 
     if(this.lock === false){
+      
       nav.classList.remove('disabled');
       calendar.classList.remove('disabled');
       buttons.classList.remove('disabled');
@@ -681,7 +746,7 @@ export class ScheduleCalendarComponent implements OnInit{
   public async autoClicked(){
 
     const clicked = this.checkAuto.nativeElement as HTMLInputElement;
-
+    const errorMessageElement = this.errorMessage2.nativeElement as HTMLDivElement;
     //const clicked = (event.target as HTMLInputElement);
 
 
@@ -692,17 +757,22 @@ export class ScheduleCalendarComponent implements OnInit{
     let bestStartDate = new Date();
 
     if( clicked.checked === false){
-      fecha.value = ""; 
+      errorMessageElement.className = "hidden";
+      errorMessageElement.innerText = "";
+      fecha.value = "";
       return;
     }
 
     if(this.plantillaElegida === undefined){
-      alert(`Advertencia: Esta casilla solo se puede marcar una vez elegida una plantilla`);
+      errorMessageElement.className = "errorMessage";
+      errorMessageElement.innerText = "No hay una plantilla de proyecto elegida";
+      
       clicked.checked = false;
       return;
     }
     clicked.checked = true;
-
+    errorMessageElement.className = "hidden";
+      errorMessageElement.innerText = "";
     const updatedUsers: User[] = this.users.map(user => ({
       ...user,
       tareas: user.tareas ? user.tareas.map(t => ({ ...t })) : []
@@ -824,10 +894,9 @@ export class ScheduleCalendarComponent implements OnInit{
 
   public async eraseProyect(event: CalendarEvent){
 
-    if(!confirm(`Está a punto de borrar el proyecto ${event.title}.\nEsta opción no se puede deshacer.\n ¿Desea continuar?`)){
-      return;
-    }
+  const ok = await this.openDialog(`Está a punto de borrar el proyecto ${event.title}.\nEsta opción no se puede deshacer.\n¿Desea continuar?`);
 
+  if (!ok) return;
     //console.log(this.usuariosFront);
     const proyectId: number = event.id as number;
     //console.log("revisando los usuarios");
@@ -881,6 +950,12 @@ export class ScheduleCalendarComponent implements OnInit{
 
   public async eliminarPlantilla(element: Plantilla){
 
+    let ok = await this.openDialog(`Está a punto de eliminar la plantilla "${element.title}".\n Esta acción no se puede deshacer, ¿Está seguro?`);
+
+    if(!ok){
+      return;
+    }
+
     const index = this.plantillas.indexOf(element);
     this.plantillas.splice(index,1);
 
@@ -904,24 +979,19 @@ export class ScheduleCalendarComponent implements OnInit{
 
   }
 
-  public cerrarSesion(){
-    if(confirm("Está a punto de cerrar la sesión.\n¿Está seguro?")){
+  public async actionCerrarSesion(){
+
       this.cookie.delete('LoginCookie'); 
       this.router.navigate(['/']);
-      
-    }
-    
-    
-    
   }
 
   public editarPlantilla(plantilla: Plantilla){
     this.router.navigate(['/proyectSchdedule'], {queryParams:{id: plantilla.id ,title: "EditarPlantilla"}});
   }
-
+  //errorMessage
   public async parsearPlantilla() {
   let date = (this.dateStartNPCP.nativeElement as HTMLInputElement).value;
-  
+  const errorMessageElement = this.errorMessage2.nativeElement as HTMLDivElement;
 
   const updatedUsers: User[] = this.users.map(user => ({
     ...user,
@@ -930,6 +1000,8 @@ export class ScheduleCalendarComponent implements OnInit{
 
 
   if(date === ""){
+    errorMessageElement.innerText = "No hay una fecha seleccionada para la plantilla";;
+    errorMessageElement.className = "errorMessage";
     return;
   }
 
@@ -977,6 +1049,8 @@ export class ScheduleCalendarComponent implements OnInit{
     const asignado = this.addUsersToTasks(updatedUsers, copiaTasks, ProyectToSave, copiaLinks, tareasPlantilla);
 
     if(!asignado){
+      errorMessageElement.className = "errorMessage";
+      errorMessageElement.innerText = "Error al Asignar, Elige una nueva fecha de inicio para el proyecto";
       return;
     }
 
@@ -1000,21 +1074,20 @@ export class ScheduleCalendarComponent implements OnInit{
 
     }
     else{
-      //console.log(date, this.plantillaElegida);
+      errorMessageElement.innerText = "No hay ninguna plantilla de proyectos seleccionada";
+      errorMessageElement.className = "hidden";
       return;
     }
   }
 
-  public elegirPlantilla(plantilla: Plantilla){
-    let date = (this.dateStartNPCP.nativeElement as HTMLInputElement);
+  public elegirPlantilla(plantilla: Plantilla, event: Event, index: number){
+
     
     if((this.plantillaElegida === undefined) || (this.plantillaElegida.id !== plantilla.id)){
       this.plantillaElegida = plantilla;
       this.autoClicked();
       //console.log("la plantilla ha cambiado");
       //date.value = "";
-    }else{
-      //console.log("la plantilla no ha cambiado");
     }
     
     
@@ -1183,8 +1256,10 @@ export class ScheduleCalendarComponent implements OnInit{
 
   }
   public async eliminarUsuario(usuario: User){
-    
-    if(!confirm(`Está a punto de eliminar al usuario ${usuario}.\n Esta acción no se puede deshacer, ¿Está seguro?`)){
+
+    let ok = await this.openDialog(`Está a punto de eliminar al usuario "${usuario.uname}".\n Esta acción no se puede deshacer, ¿Está seguro?`);
+
+    if(!ok){
       return;
     }
 

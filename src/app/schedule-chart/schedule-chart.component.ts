@@ -19,12 +19,22 @@ import { CookieService } from 'ngx-cookie-service';
   selector: 'app-schedule-chart',
   encapsulation: ViewEncapsulation.None,
   template: `
+    <div class="dialogDisabled" #dialog>
+      <div class="dialogHeader">    
+      <h1 style="margin-left: 20px;">Advertencia</h1>
+      <button class="closeButton" (click)="cancelAction()">Cancelar</button>
+      </div>
+      <h4 style="margin-left: 25px; margin-right:25px">{{confirmDLG}}</h4>
+      <div id="optionsDialog">
+        <input type="button" value="Aceptar" id="closeDialogButton" style="margin: 20px;" (click)="performAction()">
+      </div>
+    </div>
+
     <div class="header">
       <input #proyectName type="text" [value]="nameContent" id="proyectName" placeholder="el campo no puede estar vacío">
       <div>
-        <input type="button" [value]="saveButtonName" id="submit" (click)="uploadChanges()">
+        <input type="button" [value]="saveButtonName" id="submit" (click)="uploadChanges(false)">
         <input type="button" value="Volver sin Guardar" id="return" (click)="returnToCalendar()">
-        <!--<input type="button" value="Actualizar Camino Critico" id="CPM" (click)="calculateCriticalPath()">-->
       </div>
     </div>
     <div #ganttContainer class="scheduleWindow"></div>
@@ -36,7 +46,7 @@ import { CookieService } from 'ngx-cookie-service';
 
 export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy {
 
-
+  public confirmDLG: string = "";
   private dbDao: dbDAO = inject(dbDAO);
   private data: Task[] = [];
   private cpmTasks: CPMTask[] = [];
@@ -54,8 +64,8 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
 
   @ViewChild('proyectName') proyectNameField!: ElementRef;
-
   @ViewChild('ganttContainer', { static: true }) ganttContainer!: ElementRef;
+   @ViewChild('dialog') dialog!: ElementRef;
   
 
   async ngAfterViewInit(): Promise<void> {
@@ -83,6 +93,26 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
   ngOnDestroy(): void {
       window.clearInterval(this.timerID);
+  }
+
+  private dialogResolver?: (v: boolean) => void;
+
+  public async openDialog(msg: string): Promise<boolean> {
+    this.confirmDLG = msg;
+    (this.dialog.nativeElement as HTMLElement).className = 'dialogPanel';
+    return new Promise<boolean>(resolve => (this.dialogResolver = resolve));
+  }
+
+  public cancelAction() {
+    (this.dialog.nativeElement as HTMLElement).className = 'dialogDisabled';
+    this.dialogResolver?.(false);
+    this.dialogResolver = undefined;
+  }
+
+  public performAction() {
+    (this.dialog.nativeElement as HTMLElement).className = 'dialogDisabled';
+    this.dialogResolver?.(true);
+    this.dialogResolver = undefined;
   }
 
   async ngOnInit(): Promise<void>{
@@ -325,7 +355,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       this.calculateCriticalPath(gantt.config.start_date as Date);
     });
 
-    await this.uploadChanges();
+    await this.uploadChanges(true);
 
   }
 
@@ -362,11 +392,6 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
         
         break;
       }
-      case 'NuevoProyectoSP':{
-        this.nameContent = "Nuevo Proyecto";
-        this.saveButtonName = "Guardar Proyecto"
-        break;
-      }
       case 'NuevaPlantilla':{
         this.nameContent = "Nueva Plantilla";
         this.saveButtonName = "Guardar Plantilla"
@@ -385,8 +410,18 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     //console.log(this.route.snapshot.queryParams['title']);
   }
 
-  public async uploadChanges(): Promise<void>{
+  public async uploadChanges(doneByInit:boolean = false): Promise<void>{
     
+    if(!doneByInit){
+      const ok = await this.openDialog("¿Estás seguro de que deseas guardar los cambios?");
+
+      if(!ok){
+        return;
+      }
+    }
+
+
+
     const name = (this.proyectNameField.nativeElement as HTMLInputElement).value;
 
     if(this.mode === "verProyecto"){
@@ -512,6 +547,9 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
 
   public async returnToCalendar(): Promise<void>{
+
+    const ok = await this.openDialog("Todos los cambios no guardados serán descartados, ¿deseas continuar?")
+
     let tasks: any[] = []
      gantt.eachTask((task: any)=>{
       tasks.push(task);
