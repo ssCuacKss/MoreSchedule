@@ -8,3 +8,12 @@ body{
 .cal-month-view .cal-day-cell:not(:has(.cal-event[title*="⛔"])):has(.cal-event[title*="⚠️"]) .cal-day-badge::after {
   content: " ⚠️";
 }
+
+.cal-month-view .festivo-day .cal-day-number {
+  color: #891d1b; /* mismo rojo clarito que fines de semana */
+  font-weight:300;
+}
+
+.calendar-wrapper .tooltip .tooltip-inner {
+  font-family: Verdana, Geneva, Tahoma, sans-serif;
+}

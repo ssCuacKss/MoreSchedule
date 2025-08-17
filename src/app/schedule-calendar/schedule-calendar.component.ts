@@ -1,7 +1,7 @@
-import { Component, ElementRef, inject, LOCALE_ID, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, inject, LOCALE_ID, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CalendarDateFormatter, CalendarEvent, CalendarModule, CalendarMonthViewDay, CalendarMonthViewBeforeRenderEvent} from 'angular-calendar';
 import { SchedulerDateFormatter, SchedulerModule } from 'angular-calendar-scheduler';
-import { addHours, addMonths, subMonths, isSameMonth, isSameDay, format, add, addMinutes, isSaturday, isSunday} from 'date-fns';
+import { addHours, addMonths, subMonths, isSameMonth, isSameDay, format, addMinutes, isSaturday, isSunday} from 'date-fns';
 import { Router } from '@angular/router';
 import { CommonModule, registerLocaleData } from '@angular/common';
 import localeEs from '@angular/common/locales/es';
@@ -18,6 +18,8 @@ import { Task } from '../DTO/task';
 import { Link } from '../DTO/link';
 import { User } from '../DTO/user';
 import { CookieService } from 'ngx-cookie-service';
+import { delay, Subject } from 'rxjs';
+
 
 
 @Component({
@@ -65,6 +67,7 @@ import { CookieService } from 'ngx-cookie-service';
           (dayClicked)="ampliarDia($event.day)"
           [activeDayIsOpen]="activeDayIsOpen"
           [eventActionsTemplate]="eventActionsTpl"
+          [refresh]="refresh"
           (beforeViewRender)="beforeMonthViewRender($event)"/>
       </div>
     </div>
@@ -214,6 +217,7 @@ import { CookieService } from 'ngx-cookie-service';
               </div>
             </div>
           </div>
+          <div class="hidden" #errorMessageAddFechas style="width: 96%;"></div>
           <div id="saveChangesButtonDiv">
             <input type="button" value="Guardar cambios" id="saveCalendarConfig" #saveCalendarConfig (click)="saveConfig()">
             </div>
@@ -255,13 +259,14 @@ import { CookieService } from 'ngx-cookie-service';
             <div id="operatorTasks" *ngIf="(user.disponible && user.tareas !== undefined && user.tareas !== null && user.tareas.length !== 0)">
             <div class="tareasEnLinea">
               <div *ngFor="let tarea of user.tareas; index as j">
-                <span>[Tarea: {{tarea.tarea}} - termina: {{tarea.acaba}}]</span>
+                <span (click)="goToUserTask(tarea)">[Tarea: {{tarea.tarea}} - termina: {{tarea.acaba}}]</span>
               </div>
             </div>
             </div>
           </div>
         </div>
-        <input type="button" value="agregar" class="confirmChanges" (click)="actualizarUsuarios()">
+        <div class="hidden" #errorMessageEraseUser style="width: 96%;"></div>
+        <input type="button" value="agregar" class="confirmChanges" (click)="wrapperActualizarUsuarios()">
 
       </ng-template>
 
@@ -325,7 +330,7 @@ import { CookieService } from 'ngx-cookie-service';
     }
   ]
 })
-export class ScheduleCalendarComponent implements OnInit{
+export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
 
   public viewDate: Date = new Date();
@@ -346,7 +351,8 @@ export class ScheduleCalendarComponent implements OnInit{
   public proyectStatus: string = "";
   public confirmDLG: string = "";
   public actionDLG: string = "";
-
+  public refresh: Subject<void> = new Subject();
+  private timerID = 0;
 
   @ViewChild("config") private config!: ElementRef;
   @ViewChild("nav") private nav!: ElementRef;
@@ -362,6 +368,8 @@ export class ScheduleCalendarComponent implements OnInit{
   @ViewChild('NPDateStart') private dateStartNPCP!: ElementRef;
   @ViewChild('errorMessage') private errorMessage!: ElementRef;
   @ViewChild('errorMessageCreateProyect') private errorMessage2!: ElementRef;
+  @ViewChild('errorMessageEraseUser') private errorMessage3!: ElementRef;
+  @ViewChild('errorMessageAddFechas') private errorMessage4!: ElementRef;
   @ViewChild('checkAuto') private checkAuto!: ElementRef;
   @ViewChild('dialog') private dialog!: ElementRef;
 
@@ -388,26 +396,49 @@ export class ScheduleCalendarComponent implements OnInit{
       const hasWarn  = titles.some(t => t.includes('⚠️'));
 
       (day as any).emoji = hasBlock ? '⛔' : (hasWarn ? '⚠️' : ''); 
+  
+      const fechaCelda = new Date(day.date);
+      fechaCelda.setHours(0, 0, 0, 0);
+
+      const esFestivo = this.calendarConfigData?.festivos.some((festivo: any) => {
+        const inicio = new Date(festivo.diaInicio);
+        inicio.setHours(0, 0, 0, 0);
+
+        const fin = festivo.diaFin ? new Date(festivo.diaFin) : new Date(inicio);
+        fin.setHours(0, 0, 0, 0);
+
+        return fechaCelda.getTime() >= inicio.getTime() &&
+              fechaCelda.getTime() <= fin.getTime();
+      });
+
+      if (esFestivo) {
+        day.cssClass = (day.cssClass || '') + ' festivo-day';
+      }
     }
   }
 
+  async ngOnDestroy(): Promise<void> {
+      window.clearInterval(this.timerID);
+  } 
+
   async ngOnInit(): Promise<void> {
-      this.plantillas = await this.dbDao.GetTemplates().then((plantillas: Plantilla[]) =>{
-        return plantillas;
-      });
+    this.plantillas = await this.dbDao.GetTemplates().then((plantillas: Plantilla[]) =>{
+      return plantillas;
+    });
 
-      let downloadedEvents = await this.downloadEvents();
-      await this.initiateGraphicCues(downloadedEvents);
-      this.events = downloadedEvents;
-      this.calendarConfigData = await this.dbDao.GetCalendarConfig().then((config: CalendarConfig) => {
-        return config;
-      });
+    let downloadedEvents = await this.downloadEvents();
+    await this.initiateGraphicCues(downloadedEvents);
+    this.events = downloadedEvents;
+    this.calendarConfigData = await this.dbDao.GetCalendarConfig().then((config: CalendarConfig) => {
+      return config;
+    });
 
-      this.users = await this.dbDao.GetUsers().then((users: User[])=>{return users})
-      this.usuariosFront = this.users.map(user => ({ ...user }));
-      //console.log(this.usuariosFront);
-
-    }
+    this.users = await this.dbDao.GetUsers().then((users: User[])=>{return users})
+    this.usuariosFront = this.users.map(user => ({ ...user }));
+    //console.log(this.usuariosFront);
+    this.refresh.next();
+    this.timerID  = window.setInterval((() => this.refresh.next()), 60000);
+  }
 
 
   async downloadEvents(){
@@ -438,7 +469,7 @@ export class ScheduleCalendarComponent implements OnInit{
 
   public goToProyectSchedule(event: CalendarEvent): void {
 
-    this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: event.id, name: event.title, operation: "actualizar"}});
+    this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: event.id, name: event.title}});
 
   }
 
@@ -615,7 +646,7 @@ export class ScheduleCalendarComponent implements OnInit{
 
   }
 
-  public enableView(): void{
+  public async enableView(): Promise<void>{
     const nav = (this.nav.nativeElement as HTMLElement);
     const calendar = this.calendar.nativeElement as HTMLElement;
     const buttons = this.buttons.nativeElement as HTMLElement;
@@ -631,14 +662,21 @@ export class ScheduleCalendarComponent implements OnInit{
       config.querySelectorAll('input').forEach(element => element.setAttribute('disabled', 'disabled'));
       config.className = "configDisabled";
       let configBody = config.querySelector(".configBody");
+      this.calendarConfigData = await this.dbDao.GetCalendarConfig().then((config: CalendarConfig) => {
+        return config;
+      });
       if(configBody){
         configBody.className = "configBodyDisabled";
       }
       try{
         const errorMessageElement = this.errorMessage.nativeElement as HTMLDivElement;
+        const errorMessageElement2 = this.errorMessage2.nativeElement as HTMLDivElement;
+        const errorMessageElement3 = this.errorMessage3.nativeElement as HTMLDivElement;
         errorMessageElement.className = "hidden";
-      }catch(error: any){
-        
+        errorMessageElement2.className = "hidden";
+        errorMessageElement3.className = "hidden";
+      }catch(error){
+
       }
       closeButton.setAttribute("disabled", "");
     }
@@ -704,6 +742,8 @@ export class ScheduleCalendarComponent implements OnInit{
   }
 
   public async saveConfig(){
+    const original = await this.dbDao.GetCalendarConfig().then(t => t);
+
     const entrada = (this.entrada.nativeElement as HTMLInputElement).value;
     const salida = (this.salida.nativeElement as HTMLInputElement).value;
 
@@ -712,9 +752,27 @@ export class ScheduleCalendarComponent implements OnInit{
       this.calendarConfigData.salida = salida;
     }
     
+    if(original.entrada !== this.calendarConfigData.entrada || original.salida !== original.salida || this.differencesInDates(this.calendarConfigData.festivos, original.festivos)){
+      const ok = await this.openDialog("Está a punto de guardar los cambios en el horario, ¿Está seguro?");
+      if(!ok) return;
+    }
 
     await this.dbDao.updateCalendarConfigPromise(this.calendarConfigData);
+    this.refresh.next();
   }
+
+    private differencesInDates(array1: any[], array2: any[]): boolean{
+      if(array1.length === array2.length){
+          for(let i = 0; i < array1.length; i++){
+            if((array1[i].diaInicio !== array2[i].diaInicio) || ((array1[i]?.diaFin ?? "") !== (array2[i]?.diaFin ?? ""))){
+              return true;
+            }
+          }
+      }else{
+        return true;
+      }
+      return false;
+    }
 
   public agregarFechas(){
     const fechaInicio = this.fechaInicio.nativeElement as HTMLInputElement;
@@ -737,6 +795,25 @@ export class ScheduleCalendarComponent implements OnInit{
   }
 
   public eraseDate(event: Event){
+    const msgNoDelete = this.errorMessage4.nativeElement as HTMLElement;
+    const eventNames: string[] = [];
+
+    this.events.forEach((event: CalendarEvent)=>{
+      let counter = this.contarFestivos(event.start, event.end as Date);
+      if(counter > 0){
+        eventNames.push(event.title);
+      }
+    })
+
+    if(eventNames.length === 1){
+      msgNoDelete.className = "errorMessage";
+      msgNoDelete.innerText = `No se puede borrar el periodo, un proyecto pasa por el.`;
+      return;
+    }else if(eventNames.length > 1){
+      msgNoDelete.className = "errorMessage";
+      msgNoDelete.innerText = `No se puede borrar el periodo, ${eventNames.length} proyectos pasa por el.`;
+    }
+
     const listIndex = parseInt((event.target as HTMLElement).id);
     this.calendarConfigData.festivos.splice(listIndex, 1);
   }
@@ -765,7 +842,7 @@ export class ScheduleCalendarComponent implements OnInit{
 
     if(this.plantillaElegida === undefined){
       errorMessageElement.className = "errorMessage";
-      errorMessageElement.innerText = "No hay una plantilla de proyecto elegida";
+      errorMessageElement.innerText = "No hay una plantilla de proyecto elegida.";
       
       clicked.checked = false;
       return;
@@ -887,64 +964,61 @@ export class ScheduleCalendarComponent implements OnInit{
       await this.dbDao.createProyect(ProyectToSave);
       this.events = [...this.events, calendarEvent];
       //console.log(this.events);
-      this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: ProyectToSave.id, name: ProyectToSave.title, operation: "guardar"}});
+      this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: ProyectToSave.id, name: ProyectToSave.title}});
     }
 
   }
 
-  public async eraseProyect(event: CalendarEvent){
-
-  const ok = await this.openDialog(`Está a punto de borrar el proyecto ${event.title}.\nEsta opción no se puede deshacer.\n¿Desea continuar?`);
-
-  if (!ok) return;
-    //console.log(this.usuariosFront);
+  public async eraseProyect(event: CalendarEvent) {
     const proyectId: number = event.id as number;
-    //console.log("revisando los usuarios");
+
+    // 1) Comprobación estricta: SOLO si todos tienen indexUltimaTarea === 0 se puede borrar
+    const usersInProyect = this.getUsuariosConUltimaTareaEnProyecto(proyectId);
+    const alguienBloquea = usersInProyect.some(u => u.indexUltimaTarea !== 0);
+    if (alguienBloquea) {
+      await this.openDialog(
+        `No se puede eliminar el proyecto "${event.title}". Otros proyectos dependen de él.`
+      );
+      return;
+    }
+
+    // 2) Confirmación
+    const ok = await this.openDialog(
+      `Está a punto de borrar el proyecto ${event.title}.\n` +
+      `Esta opción no se puede deshacer.\n¿Desea continuar?`
+    );
+    if (!ok) return;
+
+    // 3) Borrar SOLO las tareas del proyecto en usuarios (sin tocar el resto)
+    //    Trabajamos sobre usuariosFront (estado vivo), NO sobre this.users.
     const updatedUsers: User[] = this.usuariosFront.map(user => ({
-    ...user,
-    tareas: user.tareas ? user.tareas.map(t => ({ ...t })) : []
-  }));
-    updatedUsers.forEach((user: User)=>{
-      //console.log("revisando al usuario: "+ user.uname);
-      if(user.tareas !== undefined && user.tareas !== null && user.tareas.length !== 0){
-        //console.log("el usuario tiene: ", user.tareas.length, " tareas");
-        let indexesToErase: number[] = []
-        user.tareas.forEach(tarea =>{ 
-          //console.log("comprobando tarea: ",tarea.tarea, "comparando ids (proyect vs asigned): ", proyectId, tarea.pid );
-          if(tarea.pid === proyectId){
-            //console.log("los codigos son iguales");
-            let taskIndex = user.tareas?.indexOf(tarea);
-            indexesToErase.push(taskIndex as number);
-            //user.tareas?.splice(taskIndex as number, 1);
-          }
-        });
-        indexesToErase.forEach((index: number)=>{
-          user.tareas?.splice(index);
-        });
-        indexesToErase = [];
-      }
-    });
-    //console.log(updatedUsers);
-    //console.log(this.usuariosFront);
-
-    this.usuariosFront = updatedUsers;
-
-    await this.actualizarUsuarios();
-
-    this.users = this.usuariosFront.map(user => ({
       ...user,
-      tareas: user.tareas ? user.tareas.map(t => ({ ...t })) : []
+      tareas: (user.tareas ?? []).filter(t => t.pid !== proyectId)
     }));
 
-    const indexOfEvent = this.events.indexOf(event);
-    this.events.splice(indexOfEvent, 1);
+    // 4) Mantener el invariante de la pila: índice 0 = tarea más futura
+    updatedUsers.forEach(u => {
+      if (u.tareas?.length) {
+        u.tareas.sort(
+          (a, b) => new Date(b.acaba).getTime() - new Date(a.acaba).getTime()
+        );
+      }
+    });
 
-    await this.dbDao.deleteAllByPidPromise(event.id as number);
-    await this.dbDao.deleteProyectByPidPromise(event.id as number);
+    // 5) Aplicar y persistir
+    this.usuariosFront = updatedUsers;
+    await this.actualizarUsuarios();
 
+    // 6) Quitar el evento del calendario
+    const idx = this.events.findIndex(e => e.id === proyectId);
+    if (idx >= 0) this.events.splice(idx, 1);
+
+    // 7) Eliminar del backend
+    await this.dbDao.deleteAllByPidPromise(proyectId);
+    await this.dbDao.deleteProyectByPidPromise(proyectId);
+
+    // 8) Refrescar vista
     this.events = [...this.events];
-    
-    
   }
 
 
@@ -1000,7 +1074,7 @@ export class ScheduleCalendarComponent implements OnInit{
 
 
   if(date === ""){
-    errorMessageElement.innerText = "No hay una fecha seleccionada para la plantilla";;
+    errorMessageElement.innerText = "No hay una fecha seleccionada para la plantilla.";
     errorMessageElement.className = "errorMessage";
     return;
   }
@@ -1025,7 +1099,7 @@ export class ScheduleCalendarComponent implements OnInit{
       id: Math.floor(Math.random() * 100000000),
       start: new Date(date),
       title: "Nuevo Proyecto",
-      end: addHours(date, span.hours),
+      end: new Date(new Date(date).getTime() + span.hours *3600000),
       color: {
         primary: newColor.color,
         secondary: newColor.dimmed
@@ -1048,11 +1122,11 @@ export class ScheduleCalendarComponent implements OnInit{
 
     const asignado = this.addUsersToTasks(updatedUsers, copiaTasks, ProyectToSave, copiaLinks, tareasPlantilla);
 
-    if(!asignado){
+    /*if(!asignado){
       errorMessageElement.className = "errorMessage";
       errorMessageElement.innerText = "Error al Asignar, Elige una nueva fecha de inicio para el proyecto";
       return;
-    }
+    }*/
 
     // ✅ Asignamos la copia modificada para mostrar en UI
     this.usuariosFront = updatedUsers;
@@ -1070,7 +1144,7 @@ export class ScheduleCalendarComponent implements OnInit{
 
     this.events.push(calendarEvent);
     this.events = [...this.events];
-    this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: ProyectToSave.id, name: ProyectToSave.title, operation: "guardar"}});
+    this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: ProyectToSave.id, name: ProyectToSave.title}});
 
     }
     else{
@@ -1078,6 +1152,10 @@ export class ScheduleCalendarComponent implements OnInit{
       errorMessageElement.className = "hidden";
       return;
     }
+  }
+
+  public goToUserTask(tarea: any){
+    this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: tarea.pid, name: "", tarea: tarea.tid}});
   }
 
   public elegirPlantilla(plantilla: Plantilla, event: Event, index: number){
@@ -1093,8 +1171,6 @@ export class ScheduleCalendarComponent implements OnInit{
     
   }
   private addUsersToTasks(usersForTasks: User[], tasks: Task[], proyect: Proyect, links: Link[], plantillasTarea: TareaPlantilla[]): boolean{
-
-
     tasks.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
     //console.log(this.getDependentTaskObjects(tasks[0], tasks, links));
     for(let j = 0; j < tasks.length; j++){
@@ -1251,7 +1327,7 @@ export class ScheduleCalendarComponent implements OnInit{
         password: ''
       });
       errorMessageElement.className = "validMessage";
-      errorMessageElement.innerText = "Usuario creado correctamente";
+      errorMessageElement.innerText = "Usuario creado correctamente.";
     }else{
       errorMessageElement.className = "errorMessage";
       errorMessageElement.innerText = isValid.error;
@@ -1262,11 +1338,25 @@ export class ScheduleCalendarComponent implements OnInit{
   }
   public async eliminarUsuario(usuario: User){
 
+
+    const errorUserErase = this.errorMessage3.nativeElement as HTMLDivElement;
+    
+
+    const lastDateOfWork: string | number = (usuario.tareas && usuario.tareas.length !== 0) ? usuario.tareas[0].acaba : 0;
+    if(new Date() < new Date(lastDateOfWork)){
+      errorUserErase.className = "errorMessage";
+      errorUserErase.innerText = `No se puede eliminar al usuario "${usuario.uname}", tiene tareas aún no realizadas.`;
+      return;
+    }
+
     let ok = await this.openDialog(`Está a punto de eliminar al usuario "${usuario.uname}".\n Esta acción no se puede deshacer, ¿Está seguro?`);
 
     if(!ok){
       return;
     }
+
+    errorUserErase.className = "hidden";
+    errorUserErase.innerText = "";
 
     await this.dbDao.deleteUser(usuario);
     let index = this.users.findIndex((userInList: User)=>
@@ -1297,7 +1387,13 @@ export class ScheduleCalendarComponent implements OnInit{
 
   }
 
-  public async actualizarUsuarios(){
+  public async wrapperActualizarUsuarios(){
+    const ok = await this.openDialog("Está a punto de guardar cambios en los usuarios, ¿Está seguro?");
+    if(!ok) return;
+    await this.actualizarUsuarios();
+  }
+  
+  private async actualizarUsuarios(){
   
     //console.log(this.usuariosFront, this.users);
 
@@ -1323,8 +1419,10 @@ export class ScheduleCalendarComponent implements OnInit{
     let contador = 0;
     let fecha = new Date(inicio);
     fecha.setHours(0, 0, 0, 0);
+    let fechaFin = new Date(fin)
+    fechaFin.setHours(0,0,0,0);
 
-    while (fecha <= fin) {
+    while (fecha <= fechaFin) {
       const dia = fecha.getDay();
       if (dia === 0 || dia === 6){
         contador++;
@@ -1335,131 +1433,200 @@ export class ScheduleCalendarComponent implements OnInit{
     return contador;
   }
 
-
-
-private parseTemplateTasksToGanttTasks(tasks: TareaPlantilla[], links: Link[], proyectStart: Date): Task[] {
-
-  const horaEntrada = this.calendarConfigData.entrada;
-  const horaSalida = this.calendarConfigData.salida;
-  const [hora1, minuto1] = horaEntrada.split(':').map(Number);
-  const [hora2, minuto2] = horaSalida.split(':').map(Number);
-
-  const duracionJornada =  (hora2 - hora1) * 60 + (minuto2 - minuto1);
-
-
-  const templateTasks = tasks.map((task) => {
-    
-   
-    return {
-      id: task.id,
-      text: task.text,
-      duration: task.duration,
-      offtime: 0,
-      start_date: format(proyectStart.getTime() + task.start_date * 3600000, "yyyy-MM-dd HH:mm"),
-      details: "",
-      slack: 0,
-      slack_used: 0,
-      progress: 0,
-      users: []
-    };
-  });
-
-  let adaptedTasks: Task[] = [];
-
-  let parsedTasks = templateTasks.map((value: Task)=>({
-    ...value
-  }));
-
-  parsedTasks.sort((a: Task, b: Task) => {
-    return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
-  });
-
-  //console.log(parsedTasks, links);
-
-  parsedTasks.forEach((task: Task)=>{
-    let IncomingLinks = links.filter((link: Link) => link.target === task.id);
-    let startDates: Date[] = [];
-    if(adaptedTasks.length !== 0){
-      IncomingLinks.forEach((linkPredecesor: Link)=>{
-        let taskToAdd = adaptedTasks.find((PredecesorTask) => PredecesorTask.id === linkPredecesor.source );
-        if(taskToAdd !== undefined){
-          const endTime = new Date(taskToAdd.start_date).getTime() + taskToAdd.duration * 60000;
-          startDates.push(new Date(endTime));
+  private isFestivo(fecha: Date): boolean{
+    let count = false;
+    for(let festivo of this.calendarConfigData.festivos){
+      
+      const diaInicio = new Date(festivo.diaInicio);
+      diaInicio.setHours(0,0,0,0);
+      const fechaActual = new Date(fecha);
+      fechaActual.setHours(0,0,0,0);
+  
+      if(festivo.diaFin === undefined){
+        if(fechaActual.getTime() === diaInicio.getTime()){
+          count = true;
+          break;
         }
-      });
-    }
-    
-    let taskAdjustedStartDate = task.start_date;
-
-    if (startDates.length !== 0) {
-      startDates.sort((a, b) => b.getTime() - a.getTime());
-      taskAdjustedStartDate = format(startDates[0], "yyyy-MM-dd HH:mm");
-    }
-    
-
-    //console.log(task.text, IncomingLinks, taskAdjustedStartDate);
-    let fechaInicioTarea = new Date(taskAdjustedStartDate);
-    const {horaInicioTarea, minutoInicioTarea} = {horaInicioTarea: fechaInicioTarea.getHours(), minutoInicioTarea: fechaInicioTarea.getMinutes()};
-    
-    if(horaInicioTarea < hora1 || ((horaInicioTarea === hora1 ) && (minutoInicioTarea < minuto1))){
-      fechaInicioTarea.setHours(hora1, minuto1);
-    }else if(horaInicioTarea > hora2 || ((horaInicioTarea === hora2 ) && (minutoInicioTarea >= minuto2))){
-      fechaInicioTarea.setHours(hora1, minuto1);
-      fechaInicioTarea = new Date(fechaInicioTarea.getTime() + 86400000);
-    }
-    while(isSaturday(fechaInicioTarea) || isSunday(fechaInicioTarea)){
-      fechaInicioTarea = new Date(fechaInicioTarea.getTime() + 86400000);
+      }else{
+        const diaFin = new Date(festivo.diaFin);
+        diaFin.setHours(0,0,0,0);
+        if( fechaActual.getTime() >= diaInicio.getTime() && fechaActual.getTime() <= diaFin.getTime()){
+          count = true;
+          break;
+        }
+      }
     }
 
-    //task.start_date = format(fechaInicioTarea, "yyyy-MM-dd HH:mm");
-    //console.log(fechaInicioTarea);
-    
-    let fechaFinDirecto = new Date(fechaInicioTarea.getTime() + task.duration * 60000);
-    
-    let fullJournals = Math.floor((task.duration / duracionJornada));
-    //console.log(fullJournals, (task.duration / duracionJornada));
-    
-    let tiempoFinDeSemana = this.contarFinesDeSemana(fechaInicioTarea, fechaFinDirecto);
-    //console.log(tiempoFinDeSemana, fullJournals);
-    let tiempoFueraDeJornada = tiempoFinDeSemana + fullJournals;
+    return count;
+  }
 
-    let fechaFinConFinesDeSemana = new Date(fechaInicioTarea.getTime() + task.duration * 60000  + tiempoFueraDeJornada * 86400000 );
-    const horaFin = fechaFinConFinesDeSemana.getHours();
-    const minutosFin = fechaFinConFinesDeSemana.getMinutes();
-
-    let horasExtra = 0;
-    let minutosExtra = 0;
-
-    if(horaFin > hora2 || (horaFin === hora2 && (minutosFin > minuto2))){
-      fechaFinConFinesDeSemana.setHours(hora1, minuto1);
-      fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + 86400000);
-      ++tiempoFueraDeJornada;
-      horasExtra = horaFin - hora2;
-      minutosExtra = minutosFin - minuto2;
+  private contarFestivos(inicio: Date, fin: Date): number{
+    let count = 0;
+    let fechaInicio = new Date(inicio);
+    fechaInicio.setHours(0,0,0,0);
+    let fechaFin = new Date(fin);
+    fechaFin.setHours(0,0,0,0);
+    while(fechaInicio <= fechaFin){
+      const esFestivo = this.isFestivo(fechaInicio);
+      if(esFestivo){
+        count++
+      }
+      fechaInicio = new Date(fechaInicio.getTime() + 86400000);
     }
-    let timeToAdd = (horasExtra * 60 + minutosExtra) * 60000 ;
-    tiempoFueraDeJornada += ((horasExtra + minutosExtra / 60)/24);
-    fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + timeToAdd);
+
+    return count;
+  }
+
+
+  private parseTemplateTasksToGanttTasks(tasks: TareaPlantilla[], links: Link[], proyectStart: Date): Task[] {
+
+    const horaEntrada = this.calendarConfigData.entrada;
+    const horaSalida = this.calendarConfigData.salida;
+    const [hora1, minuto1] = horaEntrada.split(':').map(Number);
+    const [hora2, minuto2] = horaSalida.split(':').map(Number);
+
+    const duracionJornada =  (hora2 - hora1) * 60 + (minuto2 - minuto1);
+
+
+    const templateTasks = tasks.map((task) => {
+      
     
-    while(isSaturday(fechaFinConFinesDeSemana) || isSunday(fechaFinConFinesDeSemana)){
-      fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + 86400000);
-      ++tiempoFueraDeJornada;
+      return {
+        id: task.id,
+        text: task.text,
+        duration: task.duration,
+        offtime: 0,
+        start_date: format(proyectStart.getTime() + task.start_date * 3600000, "yyyy-MM-dd HH:mm"),
+        details: "",
+        slack: 0,
+        slack_used: 0,
+        progress: 0,
+        users: []
+      };
+    });
+
+    let adaptedTasks: Task[] = [];
+
+    let parsedTasks = templateTasks.map((value: Task)=>({
+      ...value
+    }));
+
+    parsedTasks.sort((a: Task, b: Task) => {
+      return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
+    });
+
+    //console.log(parsedTasks, links);
+
+    parsedTasks.forEach((task: Task)=>{
+      let IncomingLinks = links.filter((link: Link) => link.target === task.id);
+      let startDates: Date[] = [];
+      if(adaptedTasks.length !== 0){
+        IncomingLinks.forEach((linkPredecesor: Link)=>{
+          let taskToAdd = adaptedTasks.find((PredecesorTask) => PredecesorTask.id === linkPredecesor.source );
+          if(taskToAdd !== undefined){
+            const endTime = new Date(taskToAdd.start_date).getTime() + taskToAdd.duration * 60000;
+            startDates.push(new Date(endTime));
+          }
+        });
+      }
+      
+      let taskAdjustedStartDate = task.start_date;
+
+      if (startDates.length !== 0) {
+        startDates.sort((a, b) => b.getTime() - a.getTime());
+        taskAdjustedStartDate = format(startDates[0], "yyyy-MM-dd HH:mm");
+      }
+      
+
+      //console.log(task.text, IncomingLinks, taskAdjustedStartDate);
+      let fechaInicioTarea = new Date(taskAdjustedStartDate);
+      const {horaInicioTarea, minutoInicioTarea} = {horaInicioTarea: fechaInicioTarea.getHours(), minutoInicioTarea: fechaInicioTarea.getMinutes()};
+      
+      if(horaInicioTarea < hora1 || ((horaInicioTarea === hora1 ) && (minutoInicioTarea < minuto1))){
+        fechaInicioTarea.setHours(hora1, minuto1);
+      }else if(horaInicioTarea > hora2 || ((horaInicioTarea === hora2 ) && (minutoInicioTarea >= minuto2))){
+        fechaInicioTarea.setHours(hora1, minuto1);
+        fechaInicioTarea = new Date(fechaInicioTarea.getTime() + 86400000);
+      }
+      while(isSaturday(fechaInicioTarea) || isSunday(fechaInicioTarea) || this.isFestivo(fechaInicioTarea)){
+        fechaInicioTarea = new Date(fechaInicioTarea.getTime() + 86400000);
+      }
+
+      //task.start_date = format(fechaInicioTarea, "yyyy-MM-dd HH:mm");
+      //console.log(fechaInicioTarea);
+      
+      let fechaFinDirecto = new Date(fechaInicioTarea.getTime() + task.duration * 60000);
+      
+      let fullJournals = Math.floor((task.duration / duracionJornada));
+      //console.log(fullJournals, (task.duration / duracionJornada));
+      
+      let tiempoNoLectivo = this.contarFinesDeSemana(fechaInicioTarea, fechaFinDirecto) + this.contarFestivos(fechaInicioTarea,fechaFinDirecto);
+      //console.log(tiempoFinDeSemana, fullJournals);
+      let tiempoFueraDeJornada = tiempoNoLectivo + fullJournals;
+
+      let fechaFinConFinesDeSemana = new Date(fechaInicioTarea.getTime() + task.duration * 60000  + tiempoFueraDeJornada * 86400000 );
+      const horaFin = fechaFinConFinesDeSemana.getHours();
+      const minutosFin = fechaFinConFinesDeSemana.getMinutes();
+
+      let horasExtra = 0;
+      let minutosExtra = 0;
+
+      if(horaFin > hora2 || (horaFin === hora2 && (minutosFin > minuto2))){
+        fechaFinConFinesDeSemana.setHours(hora1, minuto1);
+        fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + 86400000);
+        ++tiempoFueraDeJornada;
+        horasExtra = horaFin - hora2;
+        minutosExtra = minutosFin - minuto2;
+      }
+      let timeToAdd = (horasExtra * 60 + minutosExtra) * 60000 ;
+      tiempoFueraDeJornada += ((horasExtra + minutosExtra / 60)/24);
+      fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + timeToAdd);
+      
+      while(isSaturday(fechaFinConFinesDeSemana) || isSunday(fechaFinConFinesDeSemana) || this.isFestivo(fechaFinConFinesDeSemana)){
+        fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + 86400000);
+        ++tiempoFueraDeJornada;
+      }
+      
+      const duracionTotal = Math.round((fechaFinConFinesDeSemana.getTime() - fechaInicioTarea.getTime()) / 60000);
+      const duracionReal = task.duration;
+      const tiempoNoProductivo = duracionTotal - duracionReal;
+
+
+      const adaptedTask: Task = {id: task.id, text: task.text, start_date: format(fechaInicioTarea, "yyyy-MM-dd HH:mm"), duration: duracionTotal, offtime: tiempoNoProductivo, details: "", slack: 0, slack_used: 0,progress: 0 ,users: [] } 
+
+      adaptedTasks.push(adaptedTask);
+
+    });
+
+    //console.log(adaptedTasks);
+
+    return adaptedTasks;
+  }
+
+      private getUsuariosConUltimaTareaEnProyecto(pid: number) {
+        const usuariosConTarea: { usuario: any; indexUltimaTarea: number; }[] = [];
+        /*
+        Tener en cuenta el formato de la pila de tareas de un usuario, si la pila es en un momento [X,Y,Z], con X la ultima tarea que tiene asignada 
+        (es decir, la tarea que ejecutará mas en el futuro, tenindo por ahora indice 0)
+        si le asignamos una nueva tarea I al usuario, la pila tendrá la forma [I,X,Y,Z] (ahora I tiene indice 0, y X tiene indice 1);
+        */
+        this.usuariosFront.forEach((user: User) => {
+            const tareas = user.tareas ?? [];
+            //console.log(`Estas son las tarreas del usuario ${user.uname}:\n${JSON.stringify(tareas, null, 2)}\n`);
+            // Buscamos desde el indice 0 hacia abajo la última tarea del proyecto con pid: pid (es decir, buscamos desde 0, luego en 1, luego en 2...)
+            for (let i = 0; i < tareas.length ; i++) {
+                if (tareas[i].pid === pid) {
+                    usuariosConTarea.push({
+                        usuario: user,
+                        indexUltimaTarea: i
+                    });
+                    //console.log(`estamos en el user ${user.uname} su ultima tarea para el proyecto ${pid} es ${user.tareas[i].tarea}\n`);
+                    break;
+                }
+            }
+        });
+
+        return usuariosConTarea;
     }
-    
-    const duracionTotal = Math.round((fechaFinConFinesDeSemana.getTime() - fechaInicioTarea.getTime()) / 60000);
-    const duracionReal = task.duration;
-    const tiempoNoProductivo = duracionTotal - duracionReal;
-
-
-    const adaptedTask: Task = {id: task.id, text: task.text, start_date: format(fechaInicioTarea, "yyyy-MM-dd HH:mm"), duration: duracionTotal, offtime: tiempoNoProductivo, details: "", slack: 0, slack_used: 0,progress: 0 ,users: [] } 
-
-    adaptedTasks.push(adaptedTask);
-
-  });
-
-  //console.log(adaptedTasks);
-
-  return adaptedTasks;
-}
 
 }

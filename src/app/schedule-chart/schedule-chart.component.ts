@@ -1,11 +1,12 @@
 import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject, LOCALE_ID, ɵChangeDetectionSchedulerImpl, AfterViewInit, OnDestroy, makeStateKey } from '@angular/core';
-import { gantt } from 'dhtmlx-gantt';
+import { Calendar, gantt } from 'dhtmlx-gantt';
 import { dbDAO } from '../dbDAO';
 import { ActivatedRoute, EnabledBlockingInitialNavigationFeature, Route, Router} from '@angular/router';
 import { CPMTask } from '../cpmtask';
 import { Task } from '../DTO/task';
 import { Link } from '../DTO/link';
 import { Proyect } from '../DTO/proyect';
+import { CalendarConfig } from '../DTO/calendar-config';
 import { addHours, format } from 'date-fns';
 import { Plantilla } from '../DTO/plantilla';
 import { TareaPlantilla } from '../DTO/tarea-plantilla';
@@ -56,6 +57,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
   private saveFlag: boolean = true;
   private id = this.route.snapshot.queryParams['id'];  
   private mode: string = this.route.snapshot.queryParams['title'];
+  private tarea: string = this.route.snapshot.queryParams['tarea'];
   private timerID: number = 0;
 
   public nameContent: string = "";
@@ -140,6 +142,9 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     gantt.config.drag_resize = true;
     gantt.config.drag_move = true;
     gantt.config.drag_links = true;
+    gantt.config.inherit_scale_class = false;
+
+    gantt.templates.scale_cell_class = (() =>{});
 
     gantt.config.scales = [
   {
@@ -241,7 +246,37 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     return templateTasks;
   }
 
+  public isFestivo(fecha: Date, festivos: CalendarConfig): boolean{
+
+    let count = false;
+    for(let festivo of festivos.festivos){
+      
+      const diaInicio = new Date(festivo.diaInicio);
+      diaInicio.setHours(0,0,0,0);
+      const fechaActual = new Date(fecha);
+      fechaActual.setHours(0,0,0,0);
+  
+      if(festivo.diaFin === undefined){
+        if(fechaActual.getTime() === diaInicio.getTime()){
+          count = true;
+          break;
+        }
+      }else{
+        const diaFin = new Date(festivo.diaFin);
+        diaFin.setHours(0,0,0,0);
+        if( fechaActual.getTime() >= diaInicio.getTime() && fechaActual.getTime() <= diaFin.getTime()){
+          count = true;
+          break;
+        }
+      }
+    }
+
+    return count;
+  }
+
   private async initateGanttForViewProyect(){    
+
+    const horario = await this.dbDao.GetCalendarConfig();
 
     gantt.attachEvent('onLinkDblClick', () => false);
 
@@ -309,6 +344,18 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       
     ];
 
+    gantt.config.inherit_scale_class = true;
+
+    gantt.templates.scale_cell_class = (date) => {
+      if (date.getDay() === 0 || date.getDay() === 6 || this.isFestivo(date,horario)) {
+        return "highlight-day";
+      }else{
+        return "";
+      }
+    };
+
+
+
     gantt.config.scale_height = 50;
     gantt.config.min_column_width = 45;
 
@@ -356,6 +403,11 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     });
     
     await this.uploadChanges(true);
+    
+    if(this.tarea){
+      gantt.showLightbox(this.tarea);
+    }
+    
 
   }
   private checkDataforCPM(tasks: Task[]){
@@ -500,8 +552,8 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     const name = (this.proyectNameField.nativeElement as HTMLInputElement).value;
 
     if(this.mode === "verProyecto"){
-      const operation: string = this.route.snapshot.queryParams['operation'];
-        if(name && this.id && operation.length > 0){
+      
+        if(name && this.id){
 
           const content = gantt.serialize();
           try {

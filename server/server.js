@@ -331,10 +331,55 @@ async function main() {
         return usuariosConTarea;
     }
 
+    function isFestivo(fecha, festivos){
+    let count = false;
+    for(let festivo of festivos){
+      
+      const diaInicio = new Date(festivo.diaInicio);
+      diaInicio.setHours(0,0,0,0);
+      const fechaActual = new Date(fecha);
+      fechaActual.setHours(0,0,0,0);
+  
+      if(festivo.diaFin === undefined){
+        if(fechaActual.getTime() === diaInicio.getTime()){
+          count = true;
+          break;
+        }
+      }else{
+        const diaFin = new Date(festivo.diaFin);
+        diaFin.setHours(0,0,0,0);
+        if( fechaActual.getTime() >= diaInicio.getTime() && fechaActual.getTime() <= diaFin.getTime()){
+          count = true;
+          break;
+        }
+      }
+    }
+
+    return count;
+  }
+
+  function contarFestivos(inicio, fin, festivos){
+    let count = 0;
+    let fechaInicio = new Date(inicio);
+    fechaInicio.setHours(0,0,0,0);
+    let fechaFin = new Date(fin);
+    fechaFin.setHours(0,0,0,0);
+    while(fechaInicio <= fechaFin){
+      const esFestivo = isFestivo(fechaInicio, festivos);
+      if(esFestivo){
+        count++
+      }
+      fechaInicio = new Date(fechaInicio.getTime() + 86400000);
+    }
+
+    return count;
+  }
+
     function ajustarTiempoDeFin(horario, tareasProyecto, linksProyecto, offsetInicio){
 
     const horaEntrada = horario[0].entrada;
     const horaSalida  = horario[0].salida;
+    const festivos = horario[0].festivos;
     const [hora1, minuto1] = horaEntrada.split(':').map(Number);
     const [hora2, minuto2] = horaSalida.split(':').map(Number);
     const duracionJornada  = (hora2 - hora1) * 60 + (minuto2 - minuto1);
@@ -342,9 +387,9 @@ async function main() {
     tareasProyecto.forEach(task => {
 
         const original_slack = task.slack;
-        const W_original = task.duration - task.offtime - task.slack_used; // W antes de tocar nada
+        const W_original = task.duration - task.offtime - task.slack_used; // W (tiempo de la tarea sin complicaciones) antes de tocar nada
 
-        // --- Inicio calculado por predecesoras (igual que tienes) ---
+       
         let IncomingLinks = linksProyecto.filter((link) => link.target === task.id);
         let startDates = [];
         if (IncomingLinks.length !== 0) {
@@ -378,16 +423,17 @@ async function main() {
             fechaInicioTarea.setHours(hora1, minuto1);
             fechaInicioTarea = new Date(fechaInicioTarea.getTime() + 86400000);
         }
-        while (isSaturday(fechaInicioTarea) || isSunday(fechaInicioTarea)) {
+        while (isSaturday(fechaInicioTarea) || isSunday(fechaInicioTarea) || isFestivo(fechaInicioTarea, festivos)){
             fechaInicioTarea = new Date(fechaInicioTarea.getTime() + 86400000);
         }
 
         // --- Fin solo con W_original (tu lógica tal cual) ---
         let fechaFinDirecto = new Date(fechaInicioTarea.getTime() + W_original * 60000);
         let fullJournals    = Math.floor(W_original / duracionJornada);
-        let tiempoFinDeSemana = contarFinesDeSemana(fechaInicioTarea, fechaFinDirecto);
 
-        let tiempoFueraDeJornada = tiempoFinDeSemana + fullJournals;
+        let tiempoNoLectivo = contarFinesDeSemana(fechaInicioTarea, fechaFinDirecto) + contarFestivos(fechaInicioTarea, fechaFinDirecto, festivos);
+
+        let tiempoFueraDeJornada = tiempoNoLectivo + fullJournals;
         let fechaFinConFinesDeSemana = new Date(fechaInicioTarea.getTime() + W_original * 60000 + (tiempoFueraDeJornada * 86400000));
         const horaFin    = fechaFinConFinesDeSemana.getHours();
         const minutosFin = fechaFinConFinesDeSemana.getMinutes();
@@ -407,7 +453,7 @@ async function main() {
         tiempoFueraDeJornada += ((horasExtra + minutosExtra / 60) / 24);
         fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + timeToAdd);
 
-        while (isSaturday(fechaFinConFinesDeSemana) || isSunday(fechaFinConFinesDeSemana)) {
+        while (isSaturday(fechaFinConFinesDeSemana) || isSunday(fechaFinConFinesDeSemana) || isFestivo(fechaFinConFinesDeSemana, festivos)) {
             fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + 86400000);
             ++tiempoFueraDeJornada;
         }
@@ -445,10 +491,10 @@ async function main() {
             }
 
             // Si cae en fin de semana, saltamos al siguiente día laborable a primera hora
-            if (isSaturday(finNormalizado) || isSunday(finNormalizado)) {
+            if (isSaturday(finNormalizado) || isSunday(finNormalizado) || isFestivo(finNormalizado, festivos)) {
                 do {
                     finNormalizado = new Date(finNormalizado.getTime() + 86400000);
-                } while (isSaturday(finNormalizado) || isSunday(finNormalizado));
+                } while (isSaturday(finNormalizado) || isSunday(finNormalizado) || isFestivo(finNormalizado, festivos));
                 finNormalizado.setHours(hora1, minuto1);
                 continue; // re-chequear por si vuelve a pasarse del horario ese mismo día
             }

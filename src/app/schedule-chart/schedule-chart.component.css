@@ -195,3 +195,7 @@
   color: red;
   text-decoration: underline red 1px;
 }
+
+  .highlight-day {
+    color: red;
+  }
