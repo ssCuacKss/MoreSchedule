@@ -1,7 +1,7 @@
-import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject, LOCALE_ID, ɵChangeDetectionSchedulerImpl, AfterViewInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject, LOCALE_ID, ɵChangeDetectionSchedulerImpl, AfterViewInit, OnDestroy, makeStateKey } from '@angular/core';
 import { gantt } from 'dhtmlx-gantt';
 import { dbDAO } from '../dbDAO';
-import { ActivatedRoute, Route, Router} from '@angular/router';
+import { ActivatedRoute, EnabledBlockingInitialNavigationFeature, Route, Router} from '@angular/router';
 import { CPMTask } from '../cpmtask';
 import { Task } from '../DTO/task';
 import { Link } from '../DTO/link';
@@ -54,7 +54,6 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
   private router: Router = inject(Router);
   private cookie: CookieService = inject(CookieService)
   private saveFlag: boolean = true;
-
   private id = this.route.snapshot.queryParams['id'];  
   private mode: string = this.route.snapshot.queryParams['title'];
   private timerID: number = 0;
@@ -208,7 +207,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     gantt.parse({data,links});
 
     this.calculateCriticalPath(gantt.config.start_date as Date);
-
+  
   }
 
   private cambiarFecha(fecha: string): string{
@@ -351,14 +350,24 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       this.data = TaskList;
       let data = TaskList;
       let links = LinkList;
+      this.saveFlag=this.checkDataforCPM(data);
       gantt.parse({data, links});
       this.calculateCriticalPath(gantt.config.start_date as Date);
     });
-
+    
     await this.uploadChanges(true);
 
   }
-
+  private checkDataforCPM(tasks: Task[]){
+    let needSave = true;
+    for(let task of tasks){
+      if(task.slack > 0){
+        needSave = false;
+        break;
+      }
+    }
+    return needSave;
+  }
   private async GetTasksAndLinks(id: number): Promise<{TaskList: Task[] , LinkList: Link[]}> {
     
     let Tasks: Task[] = [];
@@ -410,9 +419,77 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     //console.log(this.route.snapshot.queryParams['title']);
   }
 
-  public async uploadChanges(doneByInit:boolean = false): Promise<void>{
+  private async checkDataDifferences(): Promise<boolean>{
+    const {TaskList, LinkList} = await this.GetTasksAndLinks(this.id);
+    let tasks: Task[] = [];
+    gantt.eachTask(t => {
+      tasks.push(t as Task);
+    })
+    if(tasks.length !== TaskList.length){
+      return true;
+    }
+    for(let i = 0; i < tasks.length; i++){
+      if(tasks[i].details !== TaskList[i].details || tasks[i].text !== TaskList[i].text){
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private async checkDataDifferencesTemplate(): Promise<boolean> {
+    const TaskList: TareaPlantilla[] = await this.dbDao.GetTemplateTasks(this.id);
+    const LinkList: LinkPlantilla[] = await this.dbDao.GetTemplateLinks(this.id);
+
+    let tasks: TareaPlantilla[] = [];
+    gantt.eachTask(t => {
+      tasks.push(t);
+    });
+
+    if (tasks.length !== TaskList.length) {
+      return true;
+    }
+
+    const baseMs = (gantt.config.start_date as Date).getTime();
+
+    for (let i = 0; i < tasks.length; i++) {
+      const cur = tasks[i];
+      const db  = TaskList[i];
+
+      const curOffsetHours = (new Date(cur.start_date as any).getTime() - baseMs) / 3600000;
+
+      if (
+        cur.text !== db.text ||
+        cur.duration !== db.duration ||
+        Number(cur.user_count) !== db.user_count ||
+        curOffsetHours !== db.start_date
+      ) {
+        return true;
+      }
+    }
+
+    let links: LinkPlantilla[] = gantt.getLinks() as LinkPlantilla[];
+
+    if (links.length !== LinkList.length) {
+      return true;
+    }
+
+    for (let i = 0; i < links.length; i++) {
+      if (
+        links[i].source !== LinkList[i].source ||
+        links[i].target !== LinkList[i].target
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  public async uploadChanges(doneByInit: boolean = false): Promise<void>{
     
-    if(!doneByInit){
+    const hasChanges = (this.mode === "verProyecto") ? await this.checkDataDifferences() : await this.checkDataDifferencesTemplate();
+
+    if(!doneByInit && hasChanges){
       const ok = await this.openDialog("¿Estás seguro de que deseas guardar los cambios?");
 
       if(!ok){
@@ -420,48 +497,42 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       }
     }
 
-
-
     const name = (this.proyectNameField.nativeElement as HTMLInputElement).value;
 
     if(this.mode === "verProyecto"){
       const operation: string = this.route.snapshot.queryParams['operation'];
-      if(operation === "actualizar"){
-        this.saveFlag = false;
-      }
-          if(name && this.id && operation.length > 0){
+        if(name && this.id && operation.length > 0){
 
-      const content = gantt.serialize();
-        try {
+          const content = gantt.serialize();
+          try {
 
           const element = await this.dbDao.GetProyect(this.id).then((proyect: Proyect | any) =>{
               const {startDate, hours} = this.proyectSpan();
               return {id: proyect[0].id, start: format(startDate.toString(), 'MM-dd-yyyy HH:mm'), end: hours, title: name, color: proyect[0].color} as Proyect;
-            })
+          })
 
           await this.dbDao.deleteProyectByPidPromise(element.id);
 
           await this.dbDao.createProyect(element);
           
-            if(operation === "guardar" && this.saveFlag){
-              await this.dbDao.deleteAllByPidPromise(this.id);
-              await this.dbDao.SaveProyectTasksandLinks(
-                this.id,
-                content.data,
-                content.links
-              );
-              this.saveFlag = false;
-              //console.log("guardar");
-            }else if(operation === "actualizar" || !this.saveFlag){
-              await this.dbDao.updateProyectTasks(
-                this.id,
-                content.data,
-                content.links
-              );
-              //console.log("actualizar");
-            }
-
-          
+          if(this.saveFlag){
+            await this.dbDao.deleteAllByPidPromise(this.id);
+            await this.dbDao.SaveProyectTasksandLinks(
+              this.id,
+              content.data,
+              content.links
+            );
+            this.saveFlag = false;
+            //console.log("guardar");
+          }else if(!this.saveFlag){
+            await this.dbDao.updateProyectTasks(
+              this.id,
+              content.data,
+              content.links
+            );
+            //console.log("actualizar");
+          }
+   
           
           //console.log("tareas que se envían al DAO",this.id, content.data, content.links);
 
@@ -496,6 +567,11 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
               await this.dbDao.deleteTemplateAllByPidPromise(template.id);
 
               await this.dbDao.SaveTemplateTasksandLinks(tareas,enlaces);
+
+              /*
+              await this.dbDao.deleteTemplateAllByPidPromise(template.id);
+              await this.dbDao.deleteTemplateAllByPidPromise(template.id);
+              */
 
             }catch (error){
               console.log("error: no se pudo guardar correctamente");
@@ -547,17 +623,22 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
 
   public async returnToCalendar(): Promise<void>{
+    
+    const hasChanges = (this.mode === "verProyecto") ? await this.checkDataDifferences() : await this.checkDataDifferencesTemplate();
+    let ok = false;
 
-    const ok = await this.openDialog("Todos los cambios no guardados serán descartados, ¿deseas continuar?")
-
-    let tasks: any[] = []
-     gantt.eachTask((task: any)=>{
-      tasks.push(task);
-    })
+    if(hasChanges){
+      const ok = await this.openDialog("Todos los cambios no guardados serán descartados, ¿deseas continuar?");
+      if(!ok){
+        return;
+      }
+    }
+      
+    const tasks: TareaPlantilla[] = await this.dbDao.GetTemplateTasks(this.id).then((t: TareaPlantilla[])=> {return t});
     if(tasks.length === 0){
       await this.dbDao.deleteTemplateByTidPromise(this.id);
     }
-    
+
     this.router.navigate(['/Calendar']);
   
   }

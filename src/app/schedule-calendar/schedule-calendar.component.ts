@@ -1234,9 +1234,9 @@ export class ScheduleCalendarComponent implements OnInit{
     return {result: true, error: ""};
   }
   public async uploadNewUser(){
-    const uname: string = this.crearUsuario.get("nombre")?.value;
-    const pass: string = this.crearUsuario.get("password")?.value;
-    const admin: boolean = this.crearUsuario.get("admin")?.value;
+    let uname: string = this.crearUsuario.get("nombre")?.value;
+    let pass: string = this.crearUsuario.get("password")?.value;
+    let admin: boolean = this.crearUsuario.get("admin")?.value;
     const errorMessageElement = this.errorMessage.nativeElement as HTMLDivElement;
 
     let isValid: {result: boolean, error: string} = this.checkValidCredentials(uname, pass, admin);
@@ -1246,7 +1246,12 @@ export class ScheduleCalendarComponent implements OnInit{
       await this.dbDao.createUser(newUser);
       this.users.push(newUser);
       this.usuariosFront.push(newUser);
-      this.enableView();
+      this.crearUsuario.setValue({
+        nombre: '',
+        password: ''
+      });
+      errorMessageElement.className = "validMessage";
+      errorMessageElement.innerText = "Usuario creado correctamente";
     }else{
       errorMessageElement.className = "errorMessage";
       errorMessageElement.innerText = isValid.error;

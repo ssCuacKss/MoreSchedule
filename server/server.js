@@ -578,7 +578,7 @@ async function main() {
 
         // Sembrar datos mínimos si están vacíos
         if (await db.collection('calendarConfig').countDocuments() === 0) {
-            await db.collection('calendarConfig').insertOne({ entrada: '08:00', salida: '18:00' });
+            await db.collection('calendarConfig').insertOne({ entrada: '08:00', salida: '18:00', festivos: []});
             console.log('Sembrado calendarConfig por defecto');
         }
 
