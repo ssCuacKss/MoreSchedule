@@ -1610,7 +1610,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     const regex: RegExp[] = [
     /(?=.*[A-Z])(?=.*[0-9]).{4,}/,
     /^[a-z]+$/
-  ]
+    ]
 
     if(!regex[1].test(uname)){
       messageText = "El formato de nombre no es correcto";
@@ -1660,7 +1660,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
       await this.dbDao.createUser(newUser);
       this.users.push(newUser);
       this.usuariosFront.push(newUser);
-      this.crearUsuario.setValue({
+      this.crearUsuario.patchValue({
         nombre: '',
         password: ''
       });

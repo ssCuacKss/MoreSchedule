@@ -62,7 +62,7 @@ export class LogInScreenComponent {
   //Expresiones regulares para los campos del formulario
   private readonly regex: RegExp[] = [
     /(?=.*[A-Z])(?=.*[0-9]).{4,}/,
-    /(?=.[a-z]*)(?=.[^A-Z]*).+/
+    /^[a-z]+$/
   ]
   //formgroup que almacena la información de los campos del formulario
   loginInfo: FormGroup = new FormGroup({

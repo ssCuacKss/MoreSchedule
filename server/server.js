@@ -952,15 +952,19 @@ async function main() {
     app.get('/users/auth', async (req, res) => {
         const { uname, pass } = req.query;
         if (!uname || !pass) return res.status(400).end();
-
+            const regex= [
+            /(?=.*[A-Z])(?=.*[0-9]).{4,}/,
+            /^[a-z]+$/
+            ]
         try {
+            if(!regex[1].test(uname.toString().trim()) || !regex[0].test(pass.toString().trim())){ return res.status(400).end()}
             const user = await db.collection('users')
             .findOne({ 
-                uname: uname.toString().trim().toLowerCase(), 
+                uname: uname.toString().trim(), 
                 pass: pass.toString().trim() 
             });
             if (!user) return res.status(404).end();
-
+            if (!user.admin) return res.status(403).end();
             delete user.pass;
             return res.json(user);
         } catch (err) {
@@ -975,9 +979,12 @@ async function main() {
     */
 
     app.post('/users/create', async (req, res)=>{
-        
+        const regex= [
+            /(?=.*[A-Z])(?=.*[0-9]).{4,}/,
+            /^[a-z]+$/
+            ]
         const { uname, pass, admin, disponible } = req.body;
-        if(!uname || !pass || (admin === null)) return res.status(400).end();
+        if(!regex[1].test(uname.toString().trim()) || !regex[0].test(pass.toString().trim()) || (admin === null)) return res.status(400).end();
         try{
             const inserted = await db.collection('users').
             insertOne({uname: uname, pass: pass, admin: admin, disponible: disponible})
