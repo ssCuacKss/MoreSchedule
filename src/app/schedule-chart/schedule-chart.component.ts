@@ -1,3 +1,13 @@
+/**
+ * ------------------------------------------------------------------------------------------------------------
+ * Nombre del archivo: schedule-chart.component.ts
+ * Descripción: Componente encargado de la vista de visualización y modificación de proyectos y plantillas en tablas gantt.
+ * Autor: Pablo Roldan Pueba <i92ropup@uco.es>
+ * Fecha de creación: 19/04/2025
+ * Última modificación: 18/08/2025
+ * ------------------------------------------------------------------------------------------------------------
+ */
+
 import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject, AfterViewInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { gantt } from 'dhtmlx-gantt';
 import { dbDAO } from '../dbDAO';
@@ -20,6 +30,7 @@ import { CookieService } from 'ngx-cookie-service';
   selector: 'app-schedule-chart',
   encapsulation: ViewEncapsulation.None,
   template: `
+  <!-- ventana de dialogo -->
     <div class="dialogDisabled" #dialog>
       <div class="dialogHeader">    
       <h1 style="margin-left: 20px;">Advertencia</h1>
@@ -29,8 +40,8 @@ import { CookieService } from 'ngx-cookie-service';
       <div id="optionsDialog">
         <input type="button" value="Aceptar" id="closeDialogButton" style="margin: 20px;" (click)="performAction()">
       </div>
-    </div>
-
+    </div>  
+    <!-- vista menú de la pagina -->
     <div class="header">
       <input #proyectName type="text" [value]="nameContent" id="proyectName" placeholder="el campo no puede estar vacío">
       <div>
@@ -38,6 +49,7 @@ import { CookieService } from 'ngx-cookie-service';
         <input type="button" value="Volver sin Guardar" id="return" (click)="returnToCalendar()">
       </div>
     </div>
+    <!-- vista de la tabla gantt -->
     <div #ganttContainer class="scheduleWindow"></div>
     
     `,
@@ -52,27 +64,40 @@ import { CookieService } from 'ngx-cookie-service';
 */
 
 export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy {
-
+  //texto de la ventana de dialgo
   public confirmDLG: string = "";
+  //servicio de acceso a la aAPI
   private dbDao: dbDAO = inject(dbDAO);
+  //tareas del proyecto o plantilla que se está viendo o editando 
   private data: Task[] = [];
+  //tareas con camino crítico calculado
   private cpmTasks: CPMTask[] = [];
+  //servicio de rutas activas de angular
   private route: ActivatedRoute = inject(ActivatedRoute);
+  //servicio de enrutado de angular
   private router: Router = inject(Router);
+  //servicio de cookies de angular
   private cookie: CookieService = inject(CookieService);
-  private cdr: ChangeDetectorRef = inject(ChangeDetectorRef);
+  //bandera de guardado
   private saveFlag: boolean = true;
-  private id = this.route.snapshot.queryParams['id'];  
+  //id del proyecto o plantilla en la ruta del navegador;
+  private id = this.route.snapshot.queryParams['id'];
+  //mode de la tabla agantt para la edición o visualización del proyecto o plantilla en la ruta del navegador;
   private mode: string = this.route.snapshot.queryParams['title'];
+  //tarea seleccionada para mostrar al entra a la vista
   private tarea: string = this.route.snapshot.queryParams['tarea'];
+  //identificador unico del temporizador de refresco;
   private timerID: number = 0;
-
+  //texto del campo nombre del menu
   public nameContent: string = "";
+  //texto del botón de guardado
   public saveButtonName: string = "";
 
-
+  //referencia al campo de texto que alberga el nombre del proyecto
   @ViewChild('proyectName') proyectNameField!: ElementRef;
+  //referencia al contenedor en el que insertar el componente DHTMLEGantt
   @ViewChild('ganttContainer', { static: true }) ganttContainer!: ElementRef;
+  //referencia al contenedor de la ventana de diálogo
   @ViewChild('dialog') dialog!: ElementRef;
   
   /**

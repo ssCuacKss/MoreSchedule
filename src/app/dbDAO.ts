@@ -1,3 +1,14 @@
+/**
+ * ------------------------------------------------------------------------------------------------------------
+ * Nombre del archivo: dbDAO.ts
+ * Descripción: Servicio encargado de la creación, edición, eliminación y visualizacion de los datos necesarios.
+ * para la operación normal de la app Obteniendo los datos de una API
+ * Autor: Pablo Roldan Pueba <i92ropup@uco.es>
+ * Fecha de creación: 29/04/2025
+ * Última modificación: 18/08/2025
+ * ------------------------------------------------------------------------------------------------------------
+ */
+
 import { inject, Injectable } from '@angular/core';
 import { User } from './DTO/user';
 import { addHours } from 'date-fns';
@@ -722,7 +733,7 @@ export class dbDAO {
     return parsedTasks ?? [];
   }
 
-      /**
+  /**
    * Función encargada de obtener los enlaces de una plantilla dado el id.
    * 
    * @param {number} id identificador único de la plantilla

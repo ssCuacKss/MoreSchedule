@@ -18,6 +18,7 @@ import { User } from '../DTO/user';
   standalone: true,
   template: `
     <div class="loginInfo">
+      <!-- formaulario de datos de usuario-->
       <form [formGroup]="loginInfo">
         <label for="areaTextoUsuario">Usuario</label>
         <input type="text" placeholder="Ejemplo: pablo (solo se admiten minusculas)" name="Usuario" id="areaTextoUsuario" formControlName="userName">
@@ -47,18 +48,23 @@ import { User } from '../DTO/user';
 
 export class LogInScreenComponent {
 
-
+  //servicio de enrutado de angular
   private router: Router = inject(Router);
+  //servicio de cookies de angular
   private cookie: CookieService = inject(CookieService);
+  //servicio de acceso a la API
   private user: dbDAO = inject(dbDAO);
+  //referencia al campo de contraseña 
   @ViewChild('passwordField') passWordField!: ElementRef;
+  //referencia al contenedor en el que se insertará el mensaje de error 
   @ViewChild('errorMessage')  errorMessage!: ElementRef;
 
+  //Expresiones regulares para los campos del formulario
   private readonly regex: RegExp[] = [
     /(?=.*[A-Z])(?=.*[0-9]).{4,}/,
     /(?=.[a-z]*)(?=.[^A-Z]*).+/
   ]
-
+  //formgroup que almacena la información de los campos del formulario
   loginInfo: FormGroup = new FormGroup({
     userName: new FormControl<string>(''),
     passWord: new FormControl<string>(''),

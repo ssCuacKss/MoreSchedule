@@ -1,3 +1,14 @@
+/**
+ * ----------------------------------------------------------------------------------------------------------------
+ * Nombre del archivo: server.ts
+ * Descripción: Servidor de la aplicación, expone una API RESTFull que realiza operaciones crud sobre los datos
+ * almacenados en una base de datos. tambine realiza calculos cíclicos que liberan al cliente de ese tipo de cargas
+ * Autor: Pablo Roldan Pueba <i92ropup@uco.es>
+ * Fecha de creación: 30/04/2025
+ * Última modificación: 18/08/2025
+ * -----------------------------------------------------------------------------------------------------------------
+ */
+
 const express = require('express');
 const cors = require('cors');
 const { MongoClient } = require('mongodb');

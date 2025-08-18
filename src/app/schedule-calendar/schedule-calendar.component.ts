@@ -1,3 +1,14 @@
+/**
+ * ------------------------------------------------------------------------------------------------------------
+ * Nombre del archivo: schedule-calendar.component.ts
+ * Descripción: Componente encargado de la vista y funcionalidades del calendario de proyectos
+ * y el menú de acciones.
+ * Autor: Pablo Roldan Pueba <i92ropup@uco.es>
+ * Fecha de creación: 20/04/2025
+ * Última modificación: 18/08/2025
+ * ------------------------------------------------------------------------------------------------------------
+ */
+
 import { ChangeDetectorRef, Component, ElementRef, inject, LOCALE_ID, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CalendarDateFormatter, CalendarEvent, CalendarModule, CalendarMonthViewDay, CalendarMonthViewBeforeRenderEvent} from 'angular-calendar';
 import { SchedulerDateFormatter, SchedulerModule } from 'angular-calendar-scheduler';
@@ -26,8 +37,9 @@ import { delay, Subject } from 'rxjs';
   selector: 'app-schedule-calendar',
   imports: [CommonModule ,CalendarModule, SchedulerModule,ReactiveFormsModule],
   template: `
-    
+    <!-- bloque de calendario -->
     <div (click)="enableView()" class="mainView">
+      <!-- barra de menu -->
       <div class="menu" (mouseleave)="closeAllSubmenus($event)" #nav>
         <ul class="calendarMenu">
           <li (click)="openMenu($event)" class="item" id="menu-one">Proyectos
@@ -52,6 +64,7 @@ import { delay, Subject } from 'rxjs';
           <li (click)="selectOption('CerrarSesion')" class="item" id="menu-five">Cerrar Sesión</li>
         </ul>
       </div>
+      <!-- botones de calendario -->
       <div class="calendar-controls" #buttons>
         <button id="prevMonth" class="calendarButton" (click)="previousMonth()">Mes<br>anterior</button>
         <p style="width: 7rem; text-align: center;">
@@ -59,6 +72,7 @@ import { delay, Subject } from 'rxjs';
         </p>
         <button id="nextMonth" class="calendarButton" (click)="nextMonth()">Mes<br>siguiente</button>
       </div>
+      <!-- calendarario -->
       <div style="padding: 1rem;" class="calendar" #calendar>
         <mwl-calendar-month-view 
           [viewDate]="viewDate"
@@ -71,7 +85,7 @@ import { delay, Subject } from 'rxjs';
           (beforeViewRender)="beforeMonthViewRender($event)"/>
       </div>
     </div>
-    
+    <!-- acciones sobre el proyecto -->
     <ng-template #eventActionsTpl let-event="event" >
         <span id="eventActions">
           <button class="removeProyectButton" id="removeProyect" mwlCalendarAction="delete">
@@ -88,6 +102,7 @@ import { delay, Subject } from 'rxjs';
         </span>
     </ng-template>
 
+    <!-- ventana de dialogo -->
     <div class="dialogDisabled" #dialog>
       <div class="configHeader">    
       <h1 style="margin-left: 20px;">Advertencia</h1>
@@ -99,6 +114,7 @@ import { delay, Subject } from 'rxjs';
       </div>
     </div>
 
+    <!-- ventana modal -->
     <div class="configDisabled" #config>
     
       
@@ -133,13 +149,14 @@ import { delay, Subject } from 'rxjs';
             <ng-container *ngTemplateOutlet="cerrarSesion"/>
           </div>
         </div>
+        <!-- ventana modal  cerrar sesión-->
         <ng-template #cerrarSesion>
           <h3>{{"Estás a punto de cerrar sesión. ¿Estás seguro?"}}</h3>
           <div id="optionsCerrarSesion">
             <input type="button" value="Aceptar" id="closeSessionButton" (click)="actionCerrarSesion()">
           </div>
         </ng-template>
-
+        <!-- ventana modal ver resumen -->
         <ng-template #viewSummary>
           <h3>{{calendarEventDatos?.title}}</h3>
           <div id="proyectDataHeaders">
@@ -186,7 +203,8 @@ import { delay, Subject } from 'rxjs';
           </div>
           <p id="proyectState">Estado: {{proyectStatus}}</p>
         </ng-template>
-    
+
+        <!-- ventana modal ver configuración de calendario-->
         <ng-template #calendarConfig>
         <h3>Horas de trabajo</h3>
           <div class="workHours">
@@ -222,7 +240,7 @@ import { delay, Subject } from 'rxjs';
             <input type="button" value="Guardar cambios" id="saveCalendarConfig" #saveCalendarConfig (click)="saveConfig()">
             </div>
       </ng-template>
-
+      <!-- ventana modal creación de usuario-->
       <ng-template #createUser>
         <h3>Datos de Usuario</h3>
         <form [formGroup]="crearUsuario" class="formulario" >
@@ -238,7 +256,7 @@ import { delay, Subject } from 'rxjs';
           <input type="submit" value="Registrar" (click)="uploadNewUser()">
         </form>
       </ng-template>
-
+  <!-- ventana modal edicion de usuario-->
       <ng-template #editUser>
         <h3>Editar Usuario</h3>
         <div class="listUsers">
@@ -269,7 +287,7 @@ import { delay, Subject } from 'rxjs';
         <input type="button" value="agregar" class="confirmChanges" (click)="wrapperActualizarUsuarios()">
 
       </ng-template>
-
+    <!-- ventana modal edicion  de plantilla-->
       <ng-template #editTemplate>
         <h3>Plantillas</h3>
         <div class="listTemplates">
@@ -280,13 +298,13 @@ import { delay, Subject } from 'rxjs';
               </div>
         </div>
       </ng-template>
-
+      <!-- ventana modal creación de proyecto-->
       <ng-template #newProyect>
       <h3>Plantillas</h3>
         <div class="listSelect">
               <div class="templateSelect" *ngFor="let plantilla of plantillas; index as i" [class.selectedTemplate]="plantillaElegida?.id === plantilla.id">
                   <h4>{{plantilla.title}}</h4>
-                  <input type="button" value="Usar Plantilla" id="editar" (click)="elegirPlantilla(plantilla, $event, i)">
+                  <input type="button" value="Usar Plantilla" id="editar" (click)="elegirPlantilla(plantilla)">
               </div>
         </div>
         <div class="dateStartSelector">
@@ -300,7 +318,7 @@ import { delay, Subject } from 'rxjs';
         </div>
         
       </ng-template>
-
+      <!-- ventana modal creación de proyecto sin plantilla (no usado)-->
       <ng-template #newProyectNP>
       <h3>Plantillas</h3>
         <div id="proyectNameInput">
@@ -330,57 +348,106 @@ import { delay, Subject } from 'rxjs';
     }
   ]
 })
+
+
+/**
+ * Clase encargada de inicializar y configurar el calendario y vistas y acciones principales de interacción con el sistema; 
+ * 
+ * 
+ * 
+*/
 export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
-
+  //fecha en la que iniciar el calendario
   public viewDate: Date = new Date();
-  public activeDayIsOpen: boolean = false;
+  //comprobante para abrir los proyectos de un dia
+  public activeDayIsOpen: boolean = true;
+  //servicio del DOM
   private document: Document = inject(DOCUMENT);
+  //servicio de router de angular
   private router: Router = inject(Router);
+  //servicio de cookies de angular
   private cookie: CookieService = inject(CookieService);
+  //candado para evitar fusión de eventos al cerrar o abrir opciones del menú
   private lock: boolean = false;
+  //opción elegida en un submenú
   public configOption: string = "";
+  //servicio de acceso a la API
   private dbDao: dbDAO = inject(dbDAO);
+  //servicio de detección de cambios en elementos del DOM
   private cdr: ChangeDetectorRef = inject(ChangeDetectorRef);
+  //configuracion del calendario a recuperar del servidor
   public calendarConfigData!: CalendarConfig;
+  //plantillas de proyecto recuperadas del servidor
   public plantillas!: Plantilla[];
+  //usuarios de la aplicación recuperadas del servidor
   private users!: User[];
+  //usuarios salvaguarda que representan la información de usuarios manipulada en el frontend
   public usuariosFront!: User[];
+  //plantilla elegida para un proyecto
   public plantillaElegida?: Plantilla = undefined;
+  //proyecto a resumir
   public calendarEventDatos?: CalendarEvent = undefined;
+  //tareas del proyecto a resumir
   public proyectoAResumir: Task[] = [];
+  //estado del proyecto resumido
   public proyectStatus: string = "";
+  //texto de la ventana de confirmación
   public confirmDLG: string = "";
+  //texto de la ventana de diálogo
   public actionDLG: string = "";
+  //Observable asignado a la actualización de proyectos en el calendario
   public refresh: Subject<void> = new Subject();
+  //identificador del temporizador de refresco
   private timerID = 0;
+  //proyectos de la aplicacón recuperados del servidor
+  public events: CalendarEvent[] = [];
 
+  //referencia al contenedor que contiene la ventana modal de configuración
   @ViewChild("config") private config!: ElementRef;
+  //referncia al contenedor del menú de la vista
   @ViewChild("nav") private nav!: ElementRef;
+  //referencia al contenedor de los botones que cambian el mes mostrado en el calenario
   @ViewChild("buttons") private buttons!: ElementRef;
+  //referencia al elemento de calendario
   @ViewChild("calendar") private calendar!: ElementRef;
+  //referencia al botón de cierre de la ventana modal de configuración
   @ViewChild("closeButton") private closeButton!: ElementRef;
+  //referencia al elemento que contiene la fecha de finalización de periodo festivo
   @ViewChild('fecha2') private fechaFin!: ElementRef;
+  //referencia al elemento que contiene la fecha de inicio de periodo festivo
   @ViewChild('fecha1') private fechaInicio!: ElementRef;
+  //referencia al elemento que contiene la hora de entrada laboral
   @ViewChild('entrada') private entrada!: ElementRef;
+  //referencia al elemento que contiene la hora de salida laboral
   @ViewChild('salida') private salida!: ElementRef;
+  //referencia al elemento que contiene el nombre de un nuevo proyecto sin plantilla
   @ViewChild('NPSPName') private entradaNPSP!: ElementRef;
+  //referencia al elemento que contiene la fecha de inicio de un nuevo proyecto sin plantilla
   @ViewChild('NPSPDateStart') private dateStartNPSP!: ElementRef;
+  //referencia al elemento que contiene la fecha de inicio de un nuevo proyecto a partir de una plantilla
   @ViewChild('NPDateStart') private dateStartNPCP!: ElementRef;
+  //referencia al elemento en el que se insertará el mensaje de error de creación de nuevo usuario
   @ViewChild('errorMessage') private errorMessage!: ElementRef;
+  //referencia al elemento en el que se insertará el mensaje de error de creación de nuevo proyecto
   @ViewChild('errorMessageCreateProyect') private errorMessage2!: ElementRef;
+  //referencia al elemento en el que se insertará el mensaje de error de eliminación de un usuario
   @ViewChild('errorMessageEraseUser') private errorMessage3!: ElementRef;
+  //referencia al elemento en el que se insertará el mensaje de error al eliminar un festivo
   @ViewChild('errorMessageAddFechas') private errorMessage4!: ElementRef;
+  //referencia al elemento en el que se obtiene el permiso para la asignación automática de fechas al crear un proyecto
   @ViewChild('checkAuto') private checkAuto!: ElementRef;
+  //referencia al elemento que contiene la ventana de dialgo para avisos al usuario
   @ViewChild('dialog') private dialog!: ElementRef;
 
+
+  //formgroup que gestiona los datos en el formulario de creación de usuarios
   public crearUsuario: FormGroup =  new FormGroup({
     nombre: new FormControl(''),
     password: new FormControl(''),
     admin: new FormControl(false)
   });
 
-  events: CalendarEvent[] = [];
 
   constructor(){
     registerLocaleData(localeEs);
@@ -389,6 +456,13 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     }
 
   }
+
+  /**Función encargada de renderizar ciertos elementos extra en el calendario (medalla indicadora de proyectos y marcación de festividad)
+   * 
+   * @param {CalendarMonthViewBeforeRenderEvent} ev evento que dispara el ajuste de la vista previa al ajuste
+   * 
+  */
+
   beforeMonthViewRender(ev: CalendarMonthViewBeforeRenderEvent) {
     for (const day of ev.body) {
       const titles = (day.events ?? []).map(e => String(e.title ?? ''));
@@ -418,9 +492,21 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     }
   }
 
+  /**
+   * Función onDestroy, al destruir el elemento angular se realiza la acción de limpiar los temporizadores 
+   * 
+   * 
+  */
+
   async ngOnDestroy(): Promise<void> {
       window.clearInterval(this.timerID);
   } 
+
+  /**
+   * Función onInit, al inicial el alemento angular se crea un temporizador que ejecuta acciones regularmente
+   * 
+   * 
+  */
 
   async ngOnInit(): Promise<void> {
 
@@ -431,6 +517,13 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     }, 5 * 60000);
 
   }
+  
+  /**
+   * Obtiene y guarda todas las plantillas, proyectos y usuarios de la aplicación para guardarlos en las variables de clase.
+   * ademas inicia la representación de los retrasos en proyectos
+   * 
+   * 
+  */
 
   public async refreshData(){
         this.plantillas = await this.dbDao.GetTemplates().then((plantillas: Plantilla[]) =>{
@@ -451,18 +544,43 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     
   }
 
+    /**
+   * Función que obtiene y guarda en las variables de clase los proyectos de la aplicación
+   * 
+   * 
+  */
+
   async downloadEvents(){
     let dbproyects = await this.dbDao.GetProyects();
     return dbproyects ?? [];
   }
 
+  /**
+   * Función que mueve la vista del calendario al mes siguiente
+   * 
+   * 
+  */
+
   previousMonth(): void {
     this.viewDate = subMonths(this.viewDate, 1);
   }
+
+  /**
+   * Función que mueve la vista del calendario al mes anterior
+   * 
+   * 
+  */
   
   nextMonth(): void {
     this.viewDate = addMonths(this.viewDate, 1);
   }
+
+  /**
+   * Función que muestra los proyectos que están activos en un dia seleccionado
+   * 
+   * 
+  */
+
 
   public ampliarDia(dia: CalendarMonthViewDay){
     
@@ -477,11 +595,24 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     }
   }
 
+  /**
+   * Función que redirige a la vista de la tabla gantt de un proyecto
+   * 
+   * 
+  */
+
   public goToProyectSchedule(event: CalendarEvent): void {
 
     this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: event.id, name: event.title}});
 
   }
+
+  /**
+   * Función que inicia las pistas gráficas de los proyectos de un dia seleccionado en el calendario
+   * 
+   * @param {CalendarEvent[]} proyects Array de proyectos activos en un dia de la aplicación
+   * 
+  */
 
   private async initiateGraphicCues(proyects: CalendarEvent[]){
 
@@ -508,6 +639,12 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     }
   }
 
+  /** 
+   * 
+   * Función para generar la ventana de dialogo y acciones de sus botones
+   * 
+   */
+
   private dialogResolver?: (v: boolean) => void;
 
   public async openDialog(msg: string): Promise<boolean> {
@@ -528,11 +665,18 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     this.dialogResolver = undefined;
   }
 
+
+  /**
+   * Función que tras la selección de una opción del menú, muestra su submenú de opciones
+   * 
+  */
+
   public openMenu(event: Event): void{
+    // se obtiene el contenedor del submenú
     const element = (event.currentTarget as HTMLLIElement)
     const selectable = element.querySelector('ul');
     let menuItems = this.document.querySelectorAll('.item');
-   
+   // se cierran el resto de submenus
     menuItems.forEach(item => {
       if(item.id !== element.id){
         let submenu = item.querySelector("ul");
@@ -541,6 +685,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
         }
       }
     });
+    // se abre el submenu del menú elegido
     if(selectable){
       if(selectable.className === "closed"){
         selectable.className = "dropdown";
@@ -550,12 +695,22 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     }
   }
 
+  /**
+   * Función que cierra el submenú de la aplicación seleccionado
+   * 
+  */
+
   public closeMenu(event: Event): void{
     const subMenu = event.target as HTMLUListElement;
     if(subMenu.className !== "closed"){
       subMenu.className = "closed";
     }
   }
+
+  /**
+   * Función que cierra todos los submenus
+   * 
+  */
 
   closeAllSubmenus(event: Event){
     const element = (event.currentTarget as HTMLLIElement)
@@ -571,6 +726,11 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
       }
     });
   }
+
+  /**
+   * Función que abre la ventana modal seleccionada
+   * 
+  */
 
   public selectOption(option: string): void{
 
@@ -656,6 +816,12 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
   }
 
+  /**
+   * Función que cierra la ventana modal actual y rehabilita la vista del calendario
+   * 
+   * 
+  */
+
   public async enableView(): Promise<void>{
     const nav = (this.nav.nativeElement as HTMLElement);
     const calendar = this.calendar.nativeElement as HTMLElement;
@@ -682,9 +848,11 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
         const errorMessageElement = this.errorMessage.nativeElement as HTMLDivElement;
         const errorMessageElement2 = this.errorMessage2.nativeElement as HTMLDivElement;
         const errorMessageElement3 = this.errorMessage3.nativeElement as HTMLDivElement;
+        const errorMessageElement4 = this.errorMessage4.nativeElement as HTMLDivElement;
         errorMessageElement.className = "hidden";
         errorMessageElement2.className = "hidden";
         errorMessageElement3.className = "hidden";
+        errorMessageElement4.className = "hidden";
       }catch(error){
 
       }
@@ -692,6 +860,10 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     }
   }
 
+  /**Función que obtiene un color hexadecimal aleatorio y su versión atenuada
+   * 
+   * @returns {color: string, dimmed: string} el color hexadecimal elegido y su version atenuada, ambas como strings
+  */
 
   getRandomHexColor(): { color: string; dimmed: string } {
 
@@ -702,6 +874,13 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     return { color, dimmed };
   }
 
+  /**
+   * Función que atenua un color hexadecimal un porcentaje
+   * @param {string} hex color cadena de caracteres que representan un numero hexadecimal
+   * @param {number} percent porcentaje a atenuar el color
+   * 
+   * @returns {string} la cadena de caracteres que representa un numero hexadecimal
+   */
 
   lightenColor(hex: string, percent: number): string {
   
@@ -722,6 +901,13 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
       .toUpperCase()}`;
   }
 
+  /**
+   * Función que dada una fecha, devuelve su versión ISO
+   * @param {string | undefined} usDate fecha en cualquier fomato reconocible por Date;
+   * @returns fecha como cadena en formato ISO
+   * 
+  */
+
   public formatDateToISO(usDate: string | undefined): string | undefined {
     if(usDate !== undefined){
       
@@ -732,6 +918,13 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
       return undefined;
     }  
   }
+
+  /**
+   * Función que habilita el campo de finalización de periodo vacacional
+   * @param {Event} event evento que dispara la ejecución
+   * 
+   * 
+  */
 
   public daysSpan(event: Event){
       const checkbox = event.target as HTMLInputElement;
@@ -744,6 +937,11 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
       }
 
   }
+
+  /**
+   * Función que guarda la configuración del calendario bajo demanda
+   * 
+  */
 
   public async saveConfig(){
     const original = await this.dbDao.GetCalendarConfig().then(t => t);
@@ -778,6 +976,11 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
       return false;
     }
 
+   /**
+   * Función que añade una fecha festiva a la configuración del calendario
+   * 
+   */
+
   public agregarFechas(){
     const fechaInicio = this.fechaInicio.nativeElement as HTMLInputElement;
     const fechaFin = this.fechaFin.nativeElement as HTMLInputElement;
@@ -797,6 +1000,13 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
       }
     }
   }
+
+  /**
+    * función que elimina una fecha o periodo festivo de la configuración del calendario
+    * 
+    * @param {Event} event evento que dispara la ejecución
+    * 
+  */
 
   public eraseDate(event: Event){
     const msgNoDelete = this.errorMessage4.nativeElement as HTMLElement;
@@ -822,7 +1032,12 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     this.calendarConfigData.festivos.splice(listIndex, 1);
   }
 
-  
+   /**
+    * Función que comprueba si el calculo automático de plazos de proyecto está disponible o si si es valido para una fecha dada, 
+    * requiere de una plantilla seleccionada y usuarios disponibles para dicha fecha
+    * 
+    * 
+  */  
 
   public async autoClicked(){
 
@@ -837,12 +1052,16 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
     let bestStartDate = new Date();
 
+    //si la opción ha sido desmarcada elimina la información del campo
+
     if( clicked.checked === false){
       errorMessageElement.className = "hidden";
       errorMessageElement.innerText = "";
       fecha.value = "";
       return;
     }
+
+    /**si no hay plantilla seleccionada notifica al usuario*/
 
     if(this.plantillaElegida === undefined){
       errorMessageElement.className = "errorMessage";
@@ -853,7 +1072,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     }
     clicked.checked = true;
     errorMessageElement.className = "hidden";
-      errorMessageElement.innerText = "";
+    errorMessageElement.innerText = "";
     const updatedUsers: User[] = this.users.map(user => ({
       ...user,
       tareas: user.tareas ? user.tareas.map(t => ({ ...t })) : []
@@ -863,6 +1082,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     //console.log("usuarios", updatedUsers);
 
     //console.log("startDate inicial");
+    /**conseguimos la fecha mas temprana posible en la que un usuario se queda libre, la menor de esta fecha es la mejor fecha de inicio posible*/
     for(let i: number = 0; i < updatedUsers.length; i++){
       if(!updatedUsers[i].disponible){
         continue;
@@ -900,6 +1120,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
     let asignable:boolean = false;
 
+    /** se comprueba si la fecha de inicio es válida, si no lo es, elegimos otra fecha de inicio posterior (casi nunca se ejecuta mas de una vez)*/
     while(!asignable){
       const parsedTasks: Task[] = this.parseTemplateTasksToGanttTasks(tareasPlantilla,parsedLinks ,bestStartDate);
       const span = this.proyectSpan(parsedTasks);
@@ -937,6 +1158,12 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
   }
 
+  /**
+   * 
+   * Función que inicia un nuevo proyecto sin plantilla y redirige a la vista para su edición en la tabla gantt
+   * 
+   * */
+
   public async iniciarProyecto(){
     const fecha = (this.dateStartNPSP.nativeElement as HTMLInputElement);
     const nombre = (this.entradaNPSP.nativeElement as HTMLInputElement);
@@ -973,10 +1200,17 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
   }
 
+  /**
+   * Función que elimina un proyecto si está permitido su borrado
+   * 
+   * @param {CalendarEvent} event proyecto del calendario que se desea borrar
+   * 
+  */
+
   public async eraseProyect(event: CalendarEvent) {
     const proyectId: number = event.id as number;
 
-    // 1) Comprobación estricta: SOLO si todos tienen indexUltimaTarea === 0 se puede borrar
+    // no bloquea la ejecución si todos tienen indexUltimaTarea === 0 o indexUltimaTarea = x y x no precede a la primera tarea de otro proyecto
     const usersInProyect = this.getUsuariosConUltimaTareaEnProyecto(proyectId);
     let alguienBloquea = false ;
     for(let user of usersInProyect ){
@@ -993,6 +1227,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
         }
       }
     }
+
     if (alguienBloquea) {
       await this.openDialog(
         `No se puede eliminar el proyecto "${event.title}". Otros proyectos dependen de él.`
@@ -1000,21 +1235,21 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
       return;
     }
 
-    // 2) Confirmación
+    //Confirmación
     const ok = await this.openDialog(
       `Está a punto de borrar el proyecto ${event.title}.\n` +
       `Esta opción no se puede deshacer.\n¿Desea continuar?`
     );
     if (!ok) return;
 
-    // 3) Borrar SOLO las tareas del proyecto en usuarios (sin tocar el resto)
-    //    Trabajamos sobre usuariosFront (estado vivo), NO sobre this.users.
+    // Borrado de las tareas del proyecto en usuarios
+    //    Trabajamos sobre usuariosFront 
     const updatedUsers: User[] = this.usuariosFront.map(user => ({
       ...user,
       tareas: (user.tareas ?? []).filter(t => t.pid !== proyectId)
     }));
 
-    // 4) Mantener el invariante de la pila: índice 0 = tarea más futura
+    // Mantener el invariante de la pila: índice 0 = tarea más futura
     updatedUsers.forEach(u => {
       if (u.tareas?.length) {
         u.tareas.sort(
@@ -1023,22 +1258,28 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
       }
     });
 
-    // 5) Aplicar y persistir
     this.usuariosFront = updatedUsers;
     await this.actualizarUsuarios();
 
-    // 6) Quitar el evento del calendario
+
     const idx = this.events.findIndex(e => e.id === proyectId);
     if (idx >= 0) this.events.splice(idx, 1);
 
-    // 7) Eliminar del backend
+
     await this.dbDao.deleteAllByPidPromise(proyectId);
     await this.dbDao.deleteProyectByPidPromise(proyectId);
 
-    // 8) Refrescar vista
+    // Refrescar vista
     this.events = [...this.events];
   }
 
+
+    /**
+   * Función que elimina una plantilla
+   * 
+   * @param {CalendarEvent} element plantilla que se desea borrar
+   * 
+  */
 
   public async eliminarPlantilla(element: Plantilla){
 
@@ -1058,6 +1299,11 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
   }
 
+  /**
+   * Función que genera y guarda una nueva plantilla bajo demanda y permite su inmediata edición
+   * 
+  */
+
   public async generarNuevaPlantilla(){
     let plantilla: Plantilla;
 
@@ -1071,25 +1317,43 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
   }
 
+  /**
+   * Función que elimina la cookie de sesión del usuario y redirecciona a login
+   * 
+  */
+
   public async actionCerrarSesion(){
 
       this.cookie.delete('LoginCookie'); 
       this.router.navigate(['/']);
   }
 
+   /**
+   * Función que redirige a la vista de edición de plantillas de proyectos
+   * 
+   * @param {Plantilla} plantilla plantilla que se desea editar
+   * 
+  */
+
   public editarPlantilla(plantilla: Plantilla){
     this.router.navigate(['/proyectSchdedule'], {queryParams:{id: plantilla.id ,title: "EditarPlantilla"}});
   }
-  //errorMessage
+  
+  /**
+   * Función que permite crear un nuevo proyecto a partir de una plantilla, reajustando las fechas a la jornada y dias de trabajo oficiales
+   * 
+  */
+
   public async parsearPlantilla() {
   let date = (this.dateStartNPCP.nativeElement as HTMLInputElement).value;
   const errorMessageElement = this.errorMessage2.nativeElement as HTMLDivElement;
 
+
+  // se obtienen los usuarios de la aplicación
   const updatedUsers: User[] = this.users.map(user => ({
     ...user,
     tareas: user.tareas ? user.tareas.map(t => ({ ...t })) : []
   }));
-
 
   if(date === ""){
     errorMessageElement.innerText = "No hay una fecha seleccionada para la plantilla.";
@@ -1097,6 +1361,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     return;
   }
 
+  // si hay una plantilla y una fecha realizamos la conversión a proyecto con un plazo
   if (date !== "" || this.plantillaElegida !== undefined) {
     const tareasPlantilla: TareaPlantilla[] = await this.dbDao.GetTemplateTasks(this.plantillaElegida!.id);
     
@@ -1137,16 +1402,9 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
     let copiaTasks = parsedTasks;
     let copiaLinks = parsedLinks;
-
+    //comprobamos si dada la  fecha es posible asignar un proyecto a los usuarios de la aplicación
     const asignado = this.addUsersToTasks(updatedUsers, copiaTasks, ProyectToSave, copiaLinks, tareasPlantilla);
 
-    /*if(!asignado){
-      errorMessageElement.className = "errorMessage";
-      errorMessageElement.innerText = "Error al Asignar, Elige una nueva fecha de inicio para el proyecto";
-      return;
-    }*/
-
-    // ✅ Asignamos la copia modificada para mostrar en UI
     this.usuariosFront = updatedUsers;
 
     //console.log(this.users, this.usuariosFront);
@@ -1172,31 +1430,58 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     }
   }
 
+
+  /** Función que al recibir una tarea asignada a un usuario, redirije a la vista de edición del proyecto al que pertenece la tarea
+   * ademas de abrir la ventana de configuración de dicha tarea para ver sus características.
+   * 
+   * @param tarea tarea asignada a un usuario que se desea ver
+  */
+
   public goToUserTask(tarea: any){
     this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: tarea.pid, name: "", tarea: tarea.tid}});
   }
 
-  public elegirPlantilla(plantilla: Plantilla, event: Event, index: number){
+    /**
+     * Función que marca una plantilla como elegida paraa crear un proyecto a partir de ella.
+     * 
+    */
+
+  public elegirPlantilla(plantilla: Plantilla){
 
     
     if((this.plantillaElegida === undefined) || (this.plantillaElegida.id !== plantilla.id)){
       this.plantillaElegida = plantilla;
+      // Si el campo de selección automatica está marcado, se elije automatiamente la mejor fecha de inicio
       this.autoClicked();
       //console.log("la plantilla ha cambiado");
       //date.value = "";
     }
-    
-    
+  
   }
+
+  /**
+   * Función que asigna usuarios a tareas dentro de un proyecto
+   * 
+   * @param usersForTasks usuarios de la aplicación
+   * @param tasks tareas del proyecto
+   * @param links enlaces entre tareas del proyecto (no usado)
+   * @param plantillasTarea tareas de la plantilla de la que vienen las tareas parseadas
+   * 
+   * @return {boolean} comprobante de si la asignación se realizó con exito
+   * 
+  */
+
   private addUsersToTasks(usersForTasks: User[], tasks: Task[], proyect: Proyect, links: Link[], plantillasTarea: TareaPlantilla[]): boolean{
     tasks.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
     //console.log(this.getDependentTaskObjects(tasks[0], tasks, links));
+    // Recorremos las tareas del proyecto
     for(let j = 0; j < tasks.length; j++){
       let foundCandidates = 0;
       let task = tasks[j];
       let tareaCountPlantilla = plantillasTarea.find((tarea: TareaPlantilla) =>
         tarea.id === task.id
       );
+      // Mientras no se hayan asignado el minimo de usuarios para una tarea, comprobar si hay usuarios disponibles para ella
       let userCountPlantilla = tareaCountPlantilla!.user_count;
       
       for(let i = 0; i < usersForTasks.length; i++){
@@ -1237,6 +1522,16 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     return true;
   }
 
+
+  /**
+   * Función que calcula la duración de un proyecto
+   * 
+   * @param {Task[]} tareas tareas del proyecto
+   * 
+   * @returns {startDate: Date, hours: number} fecha de inicio del proyecto y horas de duración del mismo
+   * 
+  */
+
   proyectSpan(tareas: Task[]):{startDate: Date, hours: number}{
     
     let earliestStart: Date = new Date(0); 
@@ -1263,6 +1558,12 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     return { startDate: earliestStart, hours: Math.ceil((latestEnd.getTime() - earliestStart.getTime())/3600000) };
   }
 
+  /**
+   * Obtiene la información resumida de un proyecto, deduce si el va conforme lo esperado, si hay riesgo de restraso, o si se ha retrasado
+   * 
+   * @param {CalendarEvent} event proyecto que se desea resumir 
+  */
+
   public async getProyectData(event: CalendarEvent): Promise<void>{
     this.calendarEventDatos = event;
     const pid = event.id;
@@ -1287,6 +1588,18 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     }
 
   }
+
+  /**
+   * Función que comprueba si las credenciales de un usuario son válidas
+   * 
+   * @param uname nombre del usuario (único)
+   * @param pass contraseña del usuario 
+   * @param admin rol del usuario
+   * 
+   * @return {result: boolean, error: string} comprobante de resultado de la validación
+   * 
+   * 
+  */
   
   public checkValidCredentials(uname: string, pass: string, admin: boolean): {result: boolean, error: string}{
 
@@ -1327,6 +1640,13 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     
     return {result: true, error: ""};
   }
+
+  /**
+   * Función que permite guardar un nuevo usuario bajo demanda
+   * 
+   * 
+  */
+
   public async uploadNewUser(){
     let uname: string = this.crearUsuario.get("nombre")?.value;
     let pass: string = this.crearUsuario.get("password")?.value;
@@ -1354,6 +1674,13 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     //console.log(this.users,this.usuariosFront);
 
   }
+
+  /**
+   * Función que permite eliminar a un usuario de la aplicación
+   * 
+   * @param {User} usuario usuario que se desea eliminar
+  */
+
   public async eliminarUsuario(usuario: User){
 
 
@@ -1386,7 +1713,12 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     this.usuariosFront = this.users.map(user => ({ ...user }));
 
   }
-
+  /**
+   * Función que actualiza el estado del marcador de admin en el usuario seleccionado
+   * @param event evento que dispara la ejecución
+   * @param index indice indicador del usuario que se deberá actualizar
+   * 
+  */
   public actualizarAdmin(event: Event, index: number){
 
     const check = event.currentTarget as HTMLInputElement;
@@ -1396,7 +1728,13 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
   }
 
-    public actualizarDisponible(event: Event, index: number){
+  /**
+   * Función que actualiza el estado del marcador de disponibilidad en el usuario seleccionado
+   * @param event evento que dispara la ejecución
+   * @param index indice indicador del usuario que se deberá actualizar
+   * 
+  */  
+  public actualizarDisponible(event: Event, index: number){
 
     const check = event.currentTarget as HTMLInputElement;
 
@@ -1405,12 +1743,23 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
   }
 
+  /**
+   * Función que pide confirmación al usuario para actualizar los usuarios de la aplicación,
+   * en caso de tenerla los actualiza.
+   * 
+  */  
+
   public async wrapperActualizarUsuarios(){
     const ok = await this.openDialog("Está a punto de guardar cambios en los usuarios, ¿Está seguro?");
     if(!ok) return;
     await this.actualizarUsuarios();
   }
   
+
+    /**
+   * Función que actualiza los usuarios de la aplicación.
+   * 
+  */
   private async actualizarUsuarios(){
   
     //console.log(this.usuariosFront, this.users);
@@ -1420,6 +1769,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     for(let i: number = 0; i < ammountToCompare; i++){
       let index: number = this.users.findIndex((user: User) => user.uname === this.usuariosFront[i].uname && user.pass === this.usuariosFront[i].pass);
       //console.log(this.usuariosFront[i], "index encontrado ",index)
+      /**Cada usuario que haya cambiado el el frontend actualizará al usuario en el backend */
       if(index >= 0 && ( this.usuariosFront[i].admin !== this.users[index].admin) || (this.usuariosFront[i].disponible !== this.users[index].disponible) || ((this.usuariosFront[i].tareas?.length ?? 0 )!== (this.users[index].tareas?.length ?? 0))){
         //console.log(`se procederá a actualizar a ${JSON.stringify(this.users[index])} con ${JSON.stringify(this.usuariosFront[i])}`);
         await this.dbDao.updateUsers(this.users[index], this.usuariosFront[i]);
@@ -1432,6 +1782,17 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     }));
 
   }
+
+
+    /**
+   * Función que que cuenta los dias que una fecha o periodo concreto atraviesa un dia de fin de semana
+   * 
+   * @param {Date} inicio fecha de inicio del periodo que deseamos comprobar
+   * @param {Date} fin fecha de finalización que deseamos comprobar
+   * 
+   * @returns {number} Cantidad de dias de fin de semana atravesados.
+   * 
+  */
 
   private contarFinesDeSemana(inicio: Date, fin: Date): number {
     let contador = 0;
@@ -1450,6 +1811,16 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
     return contador;
   }
+
+  /**
+   * Función que comprueba si una fecha concreta cae en un dia festivo de un calendario personalizado.
+   * 
+   * @param {Date} fecha fecha que deseamos comprobar
+   * @param {CalendarConfig} festivos calendario que contiene el listado de festivos de la aplicación 
+   * 
+   * @returns {boolean} comprobante para verificar que dicho dia es festivo.
+   * 
+  */
 
   private isFestivo(fecha: Date): boolean{
     let count = false;
@@ -1478,6 +1849,16 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     return count;
   }
 
+  /**
+   * Función que que cuenta los dias que una fecha o periodo concreto atraviesa un dia festivo de un calendario personalizado.
+   * 
+   * @param {Date} inicio fecha de inicio del periodo que deseamos comprobar
+   * @param {Date} fin fecha de finalización que deseamos comprobar
+   * 
+   * @returns {number} Cantidad de dias festivos atravesados.
+   * 
+  */
+
   private contarFestivos(inicio: Date, fin: Date): number{
     let count = 0;
     let fechaInicio = new Date(inicio);
@@ -1496,6 +1877,17 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
   }
 
 
+  /**
+   * Función que en base a una plantilla de proyecto genera sus correspondientes tareas y las ajusta al calendario lectivo (horas de trabajo, fines de semana y festivos)
+   * 
+   * @param {TareaPlantilla[]} tasks de la plantilla a traducir en proyecto
+   * @param {Link[]} links enlaces entre tarea ya traducidos de las tarea de la plantilla
+   * @param {Date} proyectStart fecha de inicio propuesta para el proyecto 
+   * 
+   * @returns {Task[]} un Array de tareas traducidias y ajustadas al calendario
+   * 
+   * */
+
   private parseTemplateTasksToGanttTasks(tasks: TareaPlantilla[], links: Link[], proyectStart: Date): Task[] {
 
     const horaEntrada = this.calendarConfigData.entrada;
@@ -1505,6 +1897,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
     const duracionJornada =  (hora2 - hora1) * 60 + (minuto2 - minuto1);
 
+    //transformamos tareas de plantilla en tareas de proyecto
 
     const templateTasks = tasks.map((task) => {
       
@@ -1536,6 +1929,9 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     //console.log(parsedTasks, links);
 
     parsedTasks.forEach((task: Task)=>{
+
+      //obtenemos las tareas predecesoras de la actual tarea
+
       let IncomingLinks = links.filter((link: Link) => link.target === task.id);
       let startDates: Date[] = [];
       if(adaptedTasks.length !== 0){
@@ -1548,6 +1944,8 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
         });
       }
       
+      // si la tarea tiene predecesoras, la fecha de inicio de la actual tarea será la mayor fecha de finalización de sus predecesoras
+      // si no tiene predecesoras, su fecha de inicio será la de por defecto
       let taskAdjustedStartDate = task.start_date;
 
       if (startDates.length !== 0) {
@@ -1555,7 +1953,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
         taskAdjustedStartDate = format(startDates[0], "yyyy-MM-dd HH:mm");
       }
       
-
+      // Ajustamos el inicio de la tarea si cae fuera de jornada laboral o dia lectivo
       //console.log(task.text, IncomingLinks, taskAdjustedStartDate);
       let fechaInicioTarea = new Date(taskAdjustedStartDate);
       const {horaInicioTarea, minutoInicioTarea} = {horaInicioTarea: fechaInicioTarea.getHours(), minutoInicioTarea: fechaInicioTarea.getMinutes()};
@@ -1573,6 +1971,8 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
       //task.start_date = format(fechaInicioTarea, "yyyy-MM-dd HH:mm");
       //console.log(fechaInicioTarea);
       
+      //calculamos cuantos dias festivos, horas fuera de jornada y dias en fin de semana que atraviesa la tarea desde el inicio
+
       let fechaFinDirecto = new Date(fechaInicioTarea.getTime() + task.duration * 60000);
       
       let fullJournals = Math.floor((task.duration / duracionJornada));
@@ -1585,6 +1985,8 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
       let fechaFinConFinesDeSemana = new Date(fechaInicioTarea.getTime() + task.duration * 60000  + tiempoFueraDeJornada * 86400000 );
       const horaFin = fechaFinConFinesDeSemana.getHours();
       const minutosFin = fechaFinConFinesDeSemana.getMinutes();
+
+      // si el final de la tarea cae en hora no lectiva, se ajusta al dia siguiente
 
       let horasExtra = 0;
       let minutosExtra = 0;
@@ -1600,11 +2002,15 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
       tiempoFueraDeJornada += ((horasExtra + minutosExtra / 60)/24);
       fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + timeToAdd);
       
+      // si tras el ajuste el fin cae en dia no lectivo, avanzamos dias hasta que caiga en dia lectivo
+
       while(isSaturday(fechaFinConFinesDeSemana) || isSunday(fechaFinConFinesDeSemana) || this.isFestivo(fechaFinConFinesDeSemana)){
         fechaFinConFinesDeSemana = new Date(fechaFinConFinesDeSemana.getTime() + 86400000);
         ++tiempoFueraDeJornada;
       }
       
+      //guardamos el ajuste de la tarea
+
       const duracionTotal = Math.round((fechaFinConFinesDeSemana.getTime() - fechaInicioTarea.getTime()) / 60000);
       const duracionReal = task.duration;
       const tiempoNoProductivo = duracionTotal - duracionReal;
@@ -1621,30 +2027,39 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     return adaptedTasks;
   }
 
-      private getUsuariosConUltimaTareaEnProyecto(pid: number) {
-        const usuariosConTarea: { usuario: any; indexUltimaTarea: number; }[] = [];
-        /*
-        Tener en cuenta el formato de la pila de tareas de un usuario, si la pila es en un momento [X,Y,Z], con X la ultima tarea que tiene asignada 
-        (es decir, la tarea que ejecutará mas en el futuro, tenindo por ahora indice 0)
-        si le asignamos una nueva tarea I al usuario, la pila tendrá la forma [I,X,Y,Z] (ahora I tiene indice 0, y X tiene indice 1);
-        */
-        this.usuariosFront.forEach((user: User) => {
-            const tareas = user.tareas ?? [];
-            //console.log(`Estas son las tarreas del usuario ${user.uname}:\n${JSON.stringify(tareas, null, 2)}\n`);
-            // Buscamos desde el indice 0 hacia abajo la última tarea del proyecto con pid: pid (es decir, buscamos desde 0, luego en 1, luego en 2...)
-            for (let i = 0; i < tareas.length ; i++) {
-                if (tareas[i].pid === pid) {
-                    usuariosConTarea.push({
-                        usuario: user,
-                        indexUltimaTarea: i
-                    });
-                    //console.log(`estamos en el user ${user.uname} su ultima tarea para el proyecto ${pid} es ${user.tareas[i].tarea}\n`);
-                    break;
-                }
-            }
-        });
+    /**
+     * Función que commprueba cual es la ultima tarea que los usuarios de un proyecto tienen asignada en este proyecto
+     * 
+     * @param {number} pid identificador único de un proyecto
+     * 
+     * @returns {{usuario: User,indexUltimaTarea: number}[]} Array de usuarios de un proyecto y el indice de su pila en al que está ultima tarea que tiene en dicho proyecto 
+     * 
+    */
 
-        return usuariosConTarea;
-    }
+  private getUsuariosConUltimaTareaEnProyecto(pid: number){
+    const usuariosConTarea: { usuario: any; indexUltimaTarea: number; }[] = [];
+    /*
+    Tener en cuenta el formato de la pila de tareas de un usuario, si la pila es en un momento [X,Y,Z], con X la ultima tarea que tiene asignada 
+    (es decir, la tarea que ejecutará mas en el futuro, tenindo por ahora indice 0)
+    si le asignamos una nueva tarea I al usuario, la pila tendrá la forma [I,X,Y,Z] (ahora I tiene indice 0, y X tiene indice 1);
+    */
+    this.usuariosFront.forEach((user: User) => {
+      const tareas = user.tareas ?? [];
+      //console.log(`Estas son las tarreas del usuario ${user.uname}:\n${JSON.stringify(tareas, null, 2)}\n`);
+      // Buscamos desde el indice 0 hacia abajo la última tarea del proyecto con pid: pid (es decir, buscamos desde 0, luego en 1, luego en 2...)
+      for (let i = 0; i < tareas.length ; i++) {
+          if (tareas[i].pid === pid) {
+              usuariosConTarea.push({
+                  usuario: user,
+                  indexUltimaTarea: i
+              });
+              //console.log(`estamos en el user ${user.uname} su ultima tarea para el proyecto ${pid} es ${user.tareas[i].tarea}\n`);
+              break;
+          }
+      }
+    });
+
+    return usuariosConTarea;
+  }
 
 }
