@@ -227,7 +227,7 @@ async function main() {
                 }
 
             }
-
+            
 
         }
         //cuando ha acabado todo directamente guardamos los datos actualizados de los usuarios en la base de datos
@@ -236,6 +236,80 @@ async function main() {
         console.log("Finalizado ajuste de tareas por slack");
     }   
 
+
+    /*async function actualizarColisionProyectos(proyecto, usuarios){
+        const tareasProyecto = await db.collection('tasks').find({pid: proyecto.id}).toArray();
+            
+
+        // se obtienen los usuarios que participan en el proyecto (un usuario tienen tareas asignadas dentro de ese proyecto) y cual es la ultima tarea que tienen asignada dentro de ese proyecto.
+
+        const usuariosAsignados = getUsuariosConUltimaTareaEnProyecto(proyecto.id, usuarios);
+        
+        // reccorremos un bucle en el que iteramos sobre todos los usuarios asignados al proyecto
+
+        for(const { usuario, indexUltimaTarea } of usuariosAsignados){
+
+            //se guardan en una pila todas las tareas del usuario sila ultima tarea de un usuario en el proyecto 
+            // tiene el indice 0 dentro de su pila, no hay proyectos por delante de este proyecto (la ultima tarea de este proyecto no tiene encima ninguna nueva tarea, por tanto no hay otro proyecto)
+            const pila = usuario.tareas;
+            if(indexUltimaTarea === 0){
+                continue;
+            }
+
+            //comprobamos si en verdad la ultima tarea del proyecto existe. si no existe se procede automaticamente con la siguiente iteración del bucle
+
+            const ultimaMeta = pila[indexUltimaTarea];
+            const ultimaTarea = tareasProyecto.find(t => t.id === ultimaMeta.tid);
+            if (!ultimaTarea){ 
+                continue;
+            }
+
+
+            //miramos cual es la tarea que tiene la ultima tarea justo encima, como hemos visto, si hay tareas por encima de la ultima tarea del proyecto en el que estamos, 
+            // significa que el usuario fue asignado despues de acabar esta tarea a otra tarea de otro proyecto.
+
+            const siguienteTarea = pila[indexUltimaTarea - 1];
+
+            // se obtiene el proyecto al que pertenece dicha siguiente tarea, si el proyecto no tiene tareas, pasamos a la siguiente ejecución del bucle.
+
+            const siguienteProyecto = proyectosFuturos.find(p => p.id === siguienteTarea.pid);
+            const tareasSiguienteProyecto = await db.collection('tasks').find({pid: siguienteProyecto.id}).toArray();
+            const linksSiguienteProyecto = await db.collection('links').find({pid: siguienteProyecto.id}).toArray();
+            if (!tareasSiguienteProyecto.length) {
+                continue;
+            }
+            
+
+            //Obtenemos la primera tarea de dicho siguiente proyecto ( las tareas están ordenadas en base de datos de menor a mayor fecha de inicio)
+            // si la tarea con la que hemos obtenido este proyecto no es la primera tarea del proyecto, simplemente pasamos a la siguiente ejecución del bucle.
+            const tareaInicio = tareasSiguienteProyecto[0];
+
+            if (siguienteTarea.tid !== tareaInicio.id) {
+                continue; 
+            }
+
+            //llegados a este punto comprobamos si la fecha de finalización de la ultima tarea del proyecto en el que nos encontramos
+            //  es mayor que la fecha de inicio de la primera tarea del siguiente proyecto, efectivamente hay un solapamiento entre proyectos, por lo que se procede a ajustar las fechas del siguiente proyecto proyecto.
+
+            const finUltima = new Date(ultimaTarea.start_date).getTime() + ultimaTarea.duration * 60000;
+            const inicioSiguiente = new Date(tareaInicio.start_date).getTime();
+
+            if (inicioSiguiente < finUltima) {
+                //se obtiene el tiempo que hay que desplazar el siguiente proyecto.
+                const desplazamiento = finUltima - inicioSiguiente;
+                // se actualizan las tareas del siguiente proyecto con su nueva duración y plazos horarios
+                ajustarTiempoDeFin(horario, tareasSiguienteProyecto, linksSiguienteProyecto, desplazamiento);
+                // se actualizan los datos de las tareas y el proyecto asignados a dichas tareas en la base de datos.
+                actualizarTareasEnBD(tareasSiguienteProyecto);
+                actualizarDuracionYInicioDeProyecto(tareasSiguienteProyecto);
+                // se actualizan los usuarios con la información de las tareas del siguiente proyecto actualizadas.
+                actualizarUsuariosConFinDeTareas(tareasSiguienteProyecto, usuarios)
+                
+            }
+
+        }
+    }*/
+    
     async function guardarUsuariosActualizados(usuarios) {
         // se actualiza usuario a usuario sus tareas en el servidor.
         await Promise.all(
@@ -274,6 +348,8 @@ async function main() {
             }
         }
     }
+
+   
 
     async function actualizarDuracionYInicioDeProyecto(tareas) {
     if (!Array.isArray(tareas) || tareas.length === 0) return;
@@ -979,12 +1055,12 @@ app.post('/tasks/updateBatch', async (req, res) => {
             pid:        t.pid,
             id:         t.id,
             text:       t.text,
-            start_date: t.start_date,
-            duration:   t.duration,
-            details:    t.details ?? "",
-            offtime:    t.offtime,
-            // slack: t.slack,   <-- INTENCIONALMENTE OMITIDO
-            slack_used: t.slack_used,
+            //start_date: t.start_date,
+            //duration:   t.duration,
+            //details:    t.details ?? "",
+            //offtime:    t.offtime,
+            //slack: t.slack,   <-- INTENCIONALMENTE OMITIDO
+            //slack_used: t.slack_used,
             progress:   t.progress,
             users:      t.users
         }));

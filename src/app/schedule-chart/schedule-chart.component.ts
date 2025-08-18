@@ -1,13 +1,13 @@
-import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject, LOCALE_ID, ɵChangeDetectionSchedulerImpl, AfterViewInit, OnDestroy, makeStateKey } from '@angular/core';
-import { Calendar, gantt } from 'dhtmlx-gantt';
+import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject, AfterViewInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { gantt } from 'dhtmlx-gantt';
 import { dbDAO } from '../dbDAO';
-import { ActivatedRoute, EnabledBlockingInitialNavigationFeature, Route, Router} from '@angular/router';
+import { ActivatedRoute, Router} from '@angular/router';
 import { CPMTask } from '../cpmtask';
 import { Task } from '../DTO/task';
 import { Link } from '../DTO/link';
 import { Proyect } from '../DTO/proyect';
 import { CalendarConfig } from '../DTO/calendar-config';
-import { addHours, format } from 'date-fns';
+import { format } from 'date-fns';
 import { Plantilla } from '../DTO/plantilla';
 import { TareaPlantilla } from '../DTO/tarea-plantilla';
 import { LinkPlantilla } from '../DTO/link-plantilla';
@@ -53,7 +53,8 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
   private cpmTasks: CPMTask[] = [];
   private route: ActivatedRoute = inject(ActivatedRoute);
   private router: Router = inject(Router);
-  private cookie: CookieService = inject(CookieService)
+  private cookie: CookieService = inject(CookieService);
+  private cdr: ChangeDetectorRef = inject(ChangeDetectorRef);
   private saveFlag: boolean = true;
   private id = this.route.snapshot.queryParams['id'];  
   private mode: string = this.route.snapshot.queryParams['title'];
@@ -74,10 +75,21 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       if(this.id !== null){
         if(this.mode === "verProyecto"){
           const element = await this.dbDao.GetProyect(this.id).then((proyect: Proyect | any) =>{
-              
             return {id: proyect[0].id, start: proyect[0].start, end: proyect[0].end, title: proyect[0].title, color: proyect[0].color} as Proyect;
           });
           this.nameContent = element.title;
+          this.timerID = window.setInterval(async()=>{
+            gantt.clearAll();
+                await this.GetTasksAndLinks(this.id).then(({ TaskList, LinkList }: { TaskList: Task[]; LinkList: Link[] }) => {
+                this.data = TaskList;
+                let data = TaskList;
+                let links = LinkList;
+                this.saveFlag = this.checkDataforCPM(data);
+                gantt.parse({data, links});
+                this.calculateCriticalPath(gantt.config.start_date as Date);
+              
+            });
+          },  2.5 * 60000);   
         }
         else if(this.mode === 'EditarPlantilla'){
           const element = await this.dbDao.GetTemplate(this.id).then((plantilla:  Plantilla | any)=>{
@@ -397,7 +409,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       this.data = TaskList;
       let data = TaskList;
       let links = LinkList;
-      this.saveFlag=this.checkDataforCPM(data);
+      this.saveFlag = this.checkDataforCPM(data);
       gantt.parse({data, links});
       this.calculateCriticalPath(gantt.config.start_date as Date);
     });
@@ -481,7 +493,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       return true;
     }
     for(let i = 0; i < tasks.length; i++){
-      if(tasks[i].details !== TaskList[i].details || tasks[i].text !== TaskList[i].text){
+      if(tasks[i].details !== TaskList[i].details || tasks[i].text !== TaskList[i].text || tasks[i].progress !== TaskList[i].progress){
         return true;
       }
     }
@@ -553,10 +565,10 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
     if(this.mode === "verProyecto"){
       
-        if(name && this.id){
+      if(name && this.id){
 
-          const content = gantt.serialize();
-          try {
+        const content = gantt.serialize();
+        try {
 
           const element = await this.dbDao.GetProyect(this.id).then((proyect: Proyect | any) =>{
               const {startDate, hours} = this.proyectSpan();
@@ -590,47 +602,45 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
           /*content.data.forEach((values: any) => {
             console.log(values['slack']);
-          });*/
-
-          
+          });*/ 
           
         } catch (err) {
           console.error('Error al subir cambios:', err);
         }
       }
+    }
+    else if(this.mode === 'EditarPlantilla'){
+      if(name && this.id){
+        const template = await this.dbDao.GetTemplate(this.id).then((plantilla: Plantilla | any) => {
+          const {startDate, hours} = this.proyectSpan();
+          return {id: plantilla[0].id, title: name, end: hours};
+        });
+        const tareas: TareaPlantilla[] = this.parseToTemplateTasks(template);
+        //console.log(tareas);
+        const enlaces: LinkPlantilla[] = this.parseTemplateLinks(template);
+        //console.log(enlaces)
+
+        try{
+
+          await this.dbDao.deleteTemplateByTidPromise(template.id);
+
+          await this.dbDao.createTemplate(template);
+
+          await this.dbDao.deleteTemplateAllByPidPromise(template.id);
+
+          await this.dbDao.SaveTemplateTasksandLinks(tareas,enlaces);
+
+          /*
+          await this.dbDao.deleteTemplateAllByPidPromise(template.id);
+          await this.dbDao.deleteTemplateAllByPidPromise(template.id);
+          */
+
+        }catch (error){
+          console.log("error: no se pudo guardar correctamente");
         }
-        else if(this.mode === 'EditarPlantilla'){
-          if(name && this.id){
-            const template = await this.dbDao.GetTemplate(this.id).then((plantilla: Plantilla | any) => {
-              const {startDate, hours} = this.proyectSpan();
-              return {id: plantilla[0].id, title: name, end: hours};
-            });
-            const tareas: TareaPlantilla[] = this.parseToTemplateTasks(template);
-            //console.log(tareas);
-            const enlaces: LinkPlantilla[] = this.parseTemplateLinks(template);
-            //console.log(enlaces)
 
-            try{
-
-              await this.dbDao.deleteTemplateByTidPromise(template.id);
-
-              await this.dbDao.createTemplate(template);
-
-              await this.dbDao.deleteTemplateAllByPidPromise(template.id);
-
-              await this.dbDao.SaveTemplateTasksandLinks(tareas,enlaces);
-
-              /*
-              await this.dbDao.deleteTemplateAllByPidPromise(template.id);
-              await this.dbDao.deleteTemplateAllByPidPromise(template.id);
-              */
-
-            }catch (error){
-              console.log("error: no se pudo guardar correctamente");
-            }
-
-          }
-        }
+      }
+    }
   }
 
   public parseTemplateLinks(template: Plantilla): LinkPlantilla[]{

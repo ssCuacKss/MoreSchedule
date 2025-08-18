@@ -1,4 +1,4 @@
-import { Component, ElementRef, inject, LOCALE_ID, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, inject, LOCALE_ID, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CalendarDateFormatter, CalendarEvent, CalendarModule, CalendarMonthViewDay, CalendarMonthViewBeforeRenderEvent} from 'angular-calendar';
 import { SchedulerDateFormatter, SchedulerModule } from 'angular-calendar-scheduler';
 import { addHours, addMonths, subMonths, isSameMonth, isSameDay, format, addMinutes, isSaturday, isSunday} from 'date-fns';
@@ -341,6 +341,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
   private lock: boolean = false;
   public configOption: string = "";
   private dbDao: dbDAO = inject(dbDAO);
+  private cdr: ChangeDetectorRef = inject(ChangeDetectorRef);
   public calendarConfigData!: CalendarConfig;
   public plantillas!: Plantilla[];
   private users!: User[];
@@ -386,7 +387,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     if(this.cookie.get('LoginCookie').valueOf() !== 'ALLOWEDTOLOGIN'){
       this.router.navigate(['/'])
     }
-    
+
   }
   beforeMonthViewRender(ev: CalendarMonthViewBeforeRenderEvent) {
     for (const day of ev.body) {
@@ -422,7 +423,17 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
   } 
 
   async ngOnInit(): Promise<void> {
-    this.plantillas = await this.dbDao.GetTemplates().then((plantillas: Plantilla[]) =>{
+
+    await this.refreshData();
+    this.timerID = window.setInterval(async() => {
+        await this.refreshData();
+        this.cdr.detectChanges();
+    }, 5 * 60000);
+
+  }
+
+  public async refreshData(){
+        this.plantillas = await this.dbDao.GetTemplates().then((plantillas: Plantilla[]) =>{
       return plantillas;
     });
 
@@ -437,9 +448,8 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     this.usuariosFront = this.users.map(user => ({ ...user }));
     //console.log(this.usuariosFront);
     this.refresh.next();
-    this.timerID  = window.setInterval((() => this.refresh.next()), 60000);
+    
   }
-
 
   async downloadEvents(){
     let dbproyects = await this.dbDao.GetProyects();
@@ -714,15 +724,9 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
   public formatDateToISO(usDate: string | undefined): string | undefined {
     if(usDate !== undefined){
-      const [month, day, year] = usDate.split('-');
+      
     // Nos aseguramos de tener dos dígitos en mes y día
-      if(month.length === 4){
-        return usDate
-      }else{
-        const mm = month.padStart(2, '0');
-        const dd = day.padStart(2, '0');
-        return `${year}-${mm}-${dd}`;
-      }
+      return format(new Date(usDate), "yyyy-MM-dd");
       
     }else{
       return undefined;
@@ -974,7 +978,21 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
     // 1) Comprobación estricta: SOLO si todos tienen indexUltimaTarea === 0 se puede borrar
     const usersInProyect = this.getUsuariosConUltimaTareaEnProyecto(proyectId);
-    const alguienBloquea = usersInProyect.some(u => u.indexUltimaTarea !== 0);
+    let alguienBloquea = false ;
+    for(let user of usersInProyect ){
+      if(user.indexUltimaTarea !== 0){
+        const nextIndex = user.indexUltimaTarea - 1;
+        const nextProyectId = user.usuario.tareas[nextIndex].pid;
+        const nextProyectTaskId = user.usuario.tareas[nextIndex].tid;
+        let tasks:Task[] = await this.dbDao.GetProyectTasks(nextProyectId).then(t => t);
+        if(tasks[0].id !== nextProyectTaskId){
+          alguienBloquea = false;
+        }else{
+          alguienBloquea = true;
+          break;
+        }
+      }
+    }
     if (alguienBloquea) {
       await this.openDialog(
         `No se puede eliminar el proyecto "${event.title}". Otros proyectos dependen de él.`
