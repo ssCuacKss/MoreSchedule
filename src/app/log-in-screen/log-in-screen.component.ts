@@ -8,6 +8,10 @@ import { dbDAO } from '../dbDAO';
 import { ViewChild } from '@angular/core';
 import { User } from '../DTO/user';
 
+
+
+
+
 @Component({
   selector: 'app-log-in-screen',
   imports: [ReactiveFormsModule, CommonModule],
@@ -32,6 +36,15 @@ import { User } from '../DTO/user';
   styleUrl: './log-in-screen.component.css',
   providers: [CookieService]
 })
+
+
+/** 
+ * Clase encargada de inicializar y configurar la presentación y funcionalidad de la vista de login; 
+ * 
+ * 
+ * 
+*/
+
 export class LogInScreenComponent {
 
 
@@ -56,7 +69,16 @@ export class LogInScreenComponent {
       this.router.navigate(['/Calendar'])
     }
   }
-
+  /**
+   * 
+   * Actualiza el tipo de area en la que se almecena la contraseña del usuario, alternar entre:
+   *     1. Un area de texto.
+   *     2. Un area de contraseña.
+   * 
+   * @param {Event} event campo HTML donde se almacena la contraseña.
+   * 
+   * 
+  */
   public updateAreaType(event: Event){
     const field = event.target as HTMLElement;
     if(field.id === "passwordVisible"){
@@ -69,7 +91,15 @@ export class LogInScreenComponent {
 
   } 
 
-    public async submitInfo(): Promise<void>{
+  /**
+   * 
+   * Verifica el formato de las credenciales del usuario de la aplicación.
+   * si tiene permiso para entrar es redirigido al calendario de la aplicación.
+   * 
+   * 
+  */
+  
+  public async submitInfo(): Promise<void>{
 
     let error = (this.errorMessage.nativeElement) as HTMLParagraphElement;
     if(this.regex[1].test(this.loginInfo.value.userName) && this.regex[0].test(this.loginInfo.value.passWord)){
@@ -91,6 +121,14 @@ export class LogInScreenComponent {
 
   }
 
+  /**
+   * 
+   * Controla el acceso al calendario de la aplicación
+   * 
+   * @param {User} user usuario de la aplicación.
+   * 
+   * 
+  */
 
   redirectToPage(user: User){
     if(user.admin){

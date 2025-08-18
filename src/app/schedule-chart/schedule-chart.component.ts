@@ -44,6 +44,12 @@ import { CookieService } from 'ngx-cookie-service';
   styleUrls: ['./schedule-chart.component.css']
 })
 
+/**
+ * Clase encargada de inicializar y configurar la tabla gantt, ademas de la configuración y edición de proyectos y plantillas; 
+ * 
+ * 
+ * 
+*/
 
 export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy {
 
@@ -67,8 +73,14 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
   @ViewChild('proyectName') proyectNameField!: ElementRef;
   @ViewChild('ganttContainer', { static: true }) ganttContainer!: ElementRef;
-   @ViewChild('dialog') dialog!: ElementRef;
+  @ViewChild('dialog') dialog!: ElementRef;
   
+  /**
+   * Función encargada de inicializar aspectos base de la tabla gantt una vez ya se ha generado su vista, como las tareas de los proyectos y plantillas, el refrescado de las tareas... etc;
+   * 
+   * 
+   * 
+  */
 
   async ngAfterViewInit(): Promise<void> {
 
@@ -89,7 +101,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
                 this.calculateCriticalPath(gantt.config.start_date as Date);
               
             });
-          },  2.5 * 60000);   
+          },  10 * 60000);   
         }
         else if(this.mode === 'EditarPlantilla'){
           const element = await this.dbDao.GetTemplate(this.id).then((plantilla:  Plantilla | any)=>{
@@ -103,10 +115,16 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
           
       }
   }
-
+  /**
+   * Función encargada de parar las acciones periódicas de la vista;
+   * 
+   * 
+  */
   ngOnDestroy(): void {
       window.clearInterval(this.timerID);
   }
+
+  /** Funciones encargadas de abrir la ventana de dialogo para confirmar o cancelar acciones*/
 
   private dialogResolver?: (v: boolean) => void;
 
@@ -128,6 +146,14 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     this.dialogResolver = undefined;
   }
 
+  /**
+   * Funcion encargada de iniciar la vista de la tabla gantt en función del modo de visualización. puede inicializar para:
+   *  1. Visualización y edición de proyectos. 
+   *  2. Visualización y edición de plantillas.
+   * 
+   * 
+  */
+
   async ngOnInit(): Promise<void>{
     
     if(this.mode === "verProyecto"){
@@ -136,6 +162,12 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       this.initiateGanttForEditTemplate();
     }
   } 
+
+  /**
+   * Inicializa la tabla gantt, el cajón de configuración de tareas y el parseado de tareas para el modo de edición de plantillas
+   * 
+   * 
+  */
 
   private async initiateGanttForEditTemplate(){
     
@@ -227,6 +259,12 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
   
   }
 
+  /** Función que comprueba el formato de la fecha de inicio de una tarea, cambiandole el formato al deseado si corresponde
+   * 
+   * @param {string} fecha cadena de caracteres que representa a una fecha 
+   * @returns {string} fecha en el formato necesario para la librería DHTMLEGantt
+  */
+
   private cambiarFecha(fecha: string): string{
     let splitFullDate = fecha.split(" ");
     let splitDate = splitFullDate[0].split("-");
@@ -236,6 +274,17 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       return `${splitDate[2]}-${splitDate[0]}-${splitDate[1]} ${splitFullDate[1]}`
     }
   }
+
+  /**
+  * parsea las tareas de una plantilla a tareas compatibles con DHTMLEGantt.
+  * 
+  * @param {TareaPlantilla[]} tasks Array de tareas de la plantilla
+  * @param {Date} proyectStart fecha de inicio de la plantilla actual actual
+  * 
+  * @returns {any[]} lista de tareas compatibles con el motor DHTMLEGantt
+  * 
+  */
+
   private  parseTemplateTasksToGanttTasks(tasks: TareaPlantilla[], proyectStart: Date): any[]{
     let templateTasks:  Task[] = [];
 
@@ -257,6 +306,16 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     });
     return templateTasks;
   }
+
+  /**
+   * Función que comprueba si una fecha concreta cae en un dia festivo de un calendario personalizado.
+   * 
+   * @param {Date} fecha fecha que deseamos comprobar
+   * @param {CalendarConfig} festivos calendario que contiene el listado de festivos de la aplicación 
+   * 
+   * @returns {boolean} comprobante para verificar que dicho dia es festivo.
+   * 
+  */
 
   public isFestivo(fecha: Date, festivos: CalendarConfig): boolean{
 
@@ -285,6 +344,12 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
     return count;
   }
+
+  /**
+  * Inicializa la tabla gantt, el cajón de configuración de tareas y el tipo de guardado requerido;
+  * 
+  * 
+  */
 
   private async initateGanttForViewProyect(){    
 
@@ -422,7 +487,16 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     
 
   }
-  private checkDataforCPM(tasks: Task[]){
+
+  /** Comprueba si un proyecto necesita ser guardado o actualizado en función de su holgura.
+   * 
+   * @param {Task[]} tasks tareas del proyecto a comprobar si requieren guardado.
+   * 
+   * @returns {boolean} comprobante para determinar si el proyecto necesita guardado o actualización.
+   *  
+  */
+
+  private checkDataforCPM(tasks: Task[]): boolean{
     let needSave = true;
     for(let task of tasks){
       if(task.slack > 0){
@@ -432,6 +506,17 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     }
     return needSave;
   }
+
+  /**
+   * Función que obtiene el conjunto de tareas y enlaces para un proyecto gantt.
+   * 
+   * @param {number} id identificador único del proyecto que contiene las tareas.
+   * 
+   * @return Conjunto de tareas y enlaces del proyecto especificado.
+   * 
+   * 
+  */
+
   private async GetTasksAndLinks(id: number): Promise<{TaskList: Task[] , LinkList: Link[]}> {
     
     let Tasks: Task[] = [];
@@ -445,6 +530,12 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
   }
 
+
+  /**
+   * Constructor que inicializa elementos básicos de la interfaz de usuario como los botones.
+   * 
+   * 
+  */
 
   constructor() {
 
@@ -483,6 +574,12 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     //console.log(this.route.snapshot.queryParams['title']);
   }
 
+  /** Función que comprueba las diferencias entre el proyecto y su versión en la base de datos
+   * 
+   * 
+   * @returns {Promise<boolean>} comprobante de diferencias entre proyectos.
+  */
+
   private async checkDataDifferences(): Promise<boolean>{
     const {TaskList, LinkList} = await this.GetTasksAndLinks(this.id);
     let tasks: Task[] = [];
@@ -499,6 +596,12 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     }
     return false;
   }
+
+  /** Función que comprueba las diferencias entre una plantilla y su versión en la base de datos
+   * 
+   * 
+   * @returns {Promise<boolean>} comprobante de diferencias entre plantillas.
+  */
 
   private async checkDataDifferencesTemplate(): Promise<boolean> {
     const TaskList: TareaPlantilla[] = await this.dbDao.GetTemplateTasks(this.id);
@@ -548,6 +651,12 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
     return false;
   }
+
+  /** Función que guarda la información del proyecto o la tarea en la base de datos
+   * 
+   * @param {boolean} doneByInit controla si la función ha sido llamada por el usuario o por la aplicación, {false} por defecto
+   * 
+  */
 
   public async uploadChanges(doneByInit: boolean = false): Promise<void>{
     
@@ -643,6 +752,14 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     }
   }
 
+  /** Función que traduce los enlaces de una plantilla de DHTMLEGantt a enlaces interpretables por la aplicación
+   * 
+   * @param {Plantilla} template Objeto plantilla a la que pertenencen los enlaces;
+   * 
+   * @returns {LinkPlantilla[]} Conjunto de enlaces entre tareas interpretables por DHTMLEGantt
+   * 
+  */
+
   public parseTemplateLinks(template: Plantilla): LinkPlantilla[]{
 
     const links = gantt.getLinks();
@@ -660,6 +777,14 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
     return templateLinks;
   }
+
+  /** Función que traduce las tareas de una plantilla de DHTMLEGantt a enlaces interpretables por la aplicación
+   * 
+   * @param {Plantilla} template Objeto plantilla a la que pertenencen los enlaces
+   * 
+   * @returns {LinkPlantilla[]} Conjunto de Tareas interpretables por la app
+   * 
+  */
 
   public parseToTemplateTasks(template: Plantilla): TareaPlantilla[]{
 
@@ -682,7 +807,10 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     return templateTasks;
   }
   
-
+  /** Función que vuelve al calendario de la aplicación, avisa al usuario si existe la posibilidad de descartar cambios.
+   * Borra automáticamente una plantilla si está vacia.
+   * 
+  */
 
   public async returnToCalendar(): Promise<void>{
     
@@ -704,6 +832,12 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     this.router.navigate(['/Calendar']);
   
   }
+
+  /** Función que Calcula el camino crítico de las tareas de la tabla gantt en función de una fecha de inicio 
+   * 
+   * @param {Date} baseStartDate Fecha de inicio de la tabla gantt
+   * 
+  */
 
   public calculateCriticalPath(baseStartDate: Date): void {
 
@@ -728,7 +862,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       }
     });
 
-    // 3) orden topológico (DFS)
+    //orden topológico, obtenermos el orden de las tareas
     const sorted: number[] = [];
     const seen: Record<number, boolean> = {};
     const dfs = (id: number) => {
@@ -739,16 +873,17 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     };
     Object.keys(graph).map(k => +k).forEach(dfs);
 
-    // 4) pasada forward: ES/EF
+    // pasada forward: calculamos el earliest start de las tareas y el earliest finish
+    // si una tarea no tiene predecesores se le añade un offset entre el inicio de proyecto y tarea.
     sorted.forEach(id => {
       const node = graph[id];
       node.ES = node.preds.length === 0
-        ? (node.start - baseStartDate.getTime()) / unitMs  // aquí se ajusta la lógica
+        ? (node.start - baseStartDate.getTime()) / unitMs 
         : Math.max(...node.preds.map(pid => graph[pid].EF!));
       node.EF = node.ES + node.dur;
     });
 
-    // 5) pasada backward: LS/LF y slack
+    // pasada backward: calculamos el latest finish y latest start
     for (let i = sorted.length - 1; i >= 0; i--) {
       const id = sorted[i];
       const node = graph[id];
@@ -761,7 +896,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
     this.cpmTasks = sorted.map(id => graph[id]);
 
-    // 6) colorear tareas críticas (slack === 0)
+    //coloreamos tareas críticas (slack === 0)
     sorted.forEach(id => {
       const task = gantt.getTask(id);
       task.color = (graph[id].slack === 0) ? '#d9534f' : '';
@@ -769,6 +904,15 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       gantt.updateTask(id);
     });
   }
+
+  /** Función que Calcula la duración de un proyecto o plantilla
+   * 
+   * @param {Date} startDate Fecha de inicio del proyecto, coincide con la fecha de inicio de la tabla gantt.
+   * @param {number} hours horas que dura el proyecto o plantilla
+   * 
+   * @returns {} hora de inicio mas temprana posible del proyecto y duración total del proyecto en horas
+   * 
+  */
 
   private proyectSpan():{startDate: Date, hours: number}{
     
