@@ -5,26 +5,44 @@ const { isLeftHandSideExpression } = require('typescript');
 const { interval, last } = require('rxjs');
 const {format, isSaturday, isSunday} = require('date-fns')
 
+
+/** URL de la base de datos mongo*/
 const MONGO_URL = 'mongodb://localhost:27017';
+/** Nombre de la base de datos*/
 const DB_NAME   = 'MoreScheduleDBdata';
+/** Puerto en el que se expone la la API*/
 const PORT      = 3000;
+/** Minutos entre actualización de tareas*/
 const MINUTES_INTERVAL = 5;
 
+
+/** 
+ * Función que se encarga de exponer la API RESTFull y el calculo cíclico de la holgura y colisión de tareas
+ * 
+ * 
+*/
 async function main() {
 
+    //configuración de la conexión a mongoDB
     const client = new MongoClient(MONGO_URL);
     await client.connect();
     const db = client.db(DB_NAME);
     console.log(`Conectado a MongoDB: ${MONGO_URL} → ${DB_NAME}`);
 
+
+    //Configuración de express como framework para crear la API
     const app = express();
     app.use(cors());
     app.use(express.json());
 
-    await ensureDatabase(db)
+
+    //Aseguramos que la base de datos exista previa a la ejecución
+    await ensureDatabase(db);
     let lastExecutionDate = new Date(await getExecDate().then(d =>{return d.lastRun}));
     let currentDate = new Date()
     let timeGap = currentDate.getTime() - lastExecutionDate.getTime();
+
+    //Recuperación de ajuste por caidas del servidor
 
     if(timeGap > ((3 * MINUTES_INTERVAL * 60000))){
         let intervals = Math.floor(timeGap / (3 * MINUTES_INTERVAL * 60000));
@@ -36,7 +54,7 @@ async function main() {
         await checkChangeOnCalendarProyectDuration();
     }
 
-
+    // Ejecución periódica del ajuste de tareas
     setInterval( async() =>{
         try{
             await checkChangeOnCalendarProyectDuration()
@@ -45,11 +63,9 @@ async function main() {
         }
     },MINUTES_INTERVAL * 60000)
     
-    
-    
-    
-
-
+    /**
+     * Función que obtiene la ultima fecha de ejecución del ajuste de tareas de la base de datos
+    */
     async function getExecDate(){
         try {
             const lastDate = await db
@@ -57,10 +73,12 @@ async function main() {
             .findOne({})
             return lastDate;
         } catch (err) {
-            console.error('Error leyendo links:', err);
-            return { error: 'Error interno al leer enlaces' };
+            console.error('Error leyendo ultima ejecución:', err);
+            return { error: 'Error interno al leer ultima ejecución' };
         }
     }
+
+    /** Función que actualiza en la base de datos la ultima fecha de ejecución del ajusto de tareas de la base de datos*/
 
     async function updateExecDate(now) {
         try {
@@ -81,12 +99,20 @@ async function main() {
     }
 
 
+
     function parsePid(req, res, next) {
         const pid = parseInt(req.query.pid, 10);
         if (isNaN(pid)) return res.status(400).json({ error: 'pid inválido' });
         req.pid = pid;
         next();
     }
+
+
+    /**
+     * Función que ajusta las tareas por su holgura y colisión con otras tareas en función de la fecha actual
+     * @param {Date} currentDate fecha actual del sistema
+     * 
+    */
 
     async function checkChangeOnCalendarProyectDuration(currentDate = new Date()){
 
@@ -237,79 +263,13 @@ async function main() {
     }   
 
 
-    /*async function actualizarColisionProyectos(proyecto, usuarios){
-        const tareasProyecto = await db.collection('tasks').find({pid: proyecto.id}).toArray();
-            
+    /**
+     * Función que toma un conjunto de usuarios guardando los cambios en la base de datos
+     * 
+     * @param usuarios Array de usuarios de la base de datos actualizados
+     * 
+    */
 
-        // se obtienen los usuarios que participan en el proyecto (un usuario tienen tareas asignadas dentro de ese proyecto) y cual es la ultima tarea que tienen asignada dentro de ese proyecto.
-
-        const usuariosAsignados = getUsuariosConUltimaTareaEnProyecto(proyecto.id, usuarios);
-        
-        // reccorremos un bucle en el que iteramos sobre todos los usuarios asignados al proyecto
-
-        for(const { usuario, indexUltimaTarea } of usuariosAsignados){
-
-            //se guardan en una pila todas las tareas del usuario sila ultima tarea de un usuario en el proyecto 
-            // tiene el indice 0 dentro de su pila, no hay proyectos por delante de este proyecto (la ultima tarea de este proyecto no tiene encima ninguna nueva tarea, por tanto no hay otro proyecto)
-            const pila = usuario.tareas;
-            if(indexUltimaTarea === 0){
-                continue;
-            }
-
-            //comprobamos si en verdad la ultima tarea del proyecto existe. si no existe se procede automaticamente con la siguiente iteración del bucle
-
-            const ultimaMeta = pila[indexUltimaTarea];
-            const ultimaTarea = tareasProyecto.find(t => t.id === ultimaMeta.tid);
-            if (!ultimaTarea){ 
-                continue;
-            }
-
-
-            //miramos cual es la tarea que tiene la ultima tarea justo encima, como hemos visto, si hay tareas por encima de la ultima tarea del proyecto en el que estamos, 
-            // significa que el usuario fue asignado despues de acabar esta tarea a otra tarea de otro proyecto.
-
-            const siguienteTarea = pila[indexUltimaTarea - 1];
-
-            // se obtiene el proyecto al que pertenece dicha siguiente tarea, si el proyecto no tiene tareas, pasamos a la siguiente ejecución del bucle.
-
-            const siguienteProyecto = proyectosFuturos.find(p => p.id === siguienteTarea.pid);
-            const tareasSiguienteProyecto = await db.collection('tasks').find({pid: siguienteProyecto.id}).toArray();
-            const linksSiguienteProyecto = await db.collection('links').find({pid: siguienteProyecto.id}).toArray();
-            if (!tareasSiguienteProyecto.length) {
-                continue;
-            }
-            
-
-            //Obtenemos la primera tarea de dicho siguiente proyecto ( las tareas están ordenadas en base de datos de menor a mayor fecha de inicio)
-            // si la tarea con la que hemos obtenido este proyecto no es la primera tarea del proyecto, simplemente pasamos a la siguiente ejecución del bucle.
-            const tareaInicio = tareasSiguienteProyecto[0];
-
-            if (siguienteTarea.tid !== tareaInicio.id) {
-                continue; 
-            }
-
-            //llegados a este punto comprobamos si la fecha de finalización de la ultima tarea del proyecto en el que nos encontramos
-            //  es mayor que la fecha de inicio de la primera tarea del siguiente proyecto, efectivamente hay un solapamiento entre proyectos, por lo que se procede a ajustar las fechas del siguiente proyecto proyecto.
-
-            const finUltima = new Date(ultimaTarea.start_date).getTime() + ultimaTarea.duration * 60000;
-            const inicioSiguiente = new Date(tareaInicio.start_date).getTime();
-
-            if (inicioSiguiente < finUltima) {
-                //se obtiene el tiempo que hay que desplazar el siguiente proyecto.
-                const desplazamiento = finUltima - inicioSiguiente;
-                // se actualizan las tareas del siguiente proyecto con su nueva duración y plazos horarios
-                ajustarTiempoDeFin(horario, tareasSiguienteProyecto, linksSiguienteProyecto, desplazamiento);
-                // se actualizan los datos de las tareas y el proyecto asignados a dichas tareas en la base de datos.
-                actualizarTareasEnBD(tareasSiguienteProyecto);
-                actualizarDuracionYInicioDeProyecto(tareasSiguienteProyecto);
-                // se actualizan los usuarios con la información de las tareas del siguiente proyecto actualizadas.
-                actualizarUsuariosConFinDeTareas(tareasSiguienteProyecto, usuarios)
-                
-            }
-
-        }
-    }*/
-    
     async function guardarUsuariosActualizados(usuarios) {
         // se actualiza usuario a usuario sus tareas en el servidor.
         await Promise.all(
@@ -321,7 +281,16 @@ async function main() {
             })
         );
         }
+    
 
+    /**
+     * Función que toma un conjunto de usuarios cuyas tareas han sido actualizadas y guarda los cambios en la base de datos
+     * 
+     * @param usuarios Array de usuarios de la base de datos con tareas actualizadas
+     * @param tareas Array de tareas actualizadas de los usuarios
+     * 
+    */
+    
     async function actualizarUsuariosConFinDeTareas(tareas, usuarios) {
         for (const tarea of tareas) {
             const pid = tarea.pid;
@@ -349,7 +318,12 @@ async function main() {
         }
     }
 
-   
+       /**
+     * Función que toma un conjunto de tareas actualizadas y guarda los cambios en el proyecto
+     * 
+     * @param tareas Array de tareas actualizadas de un proyecto
+     * 
+    */
 
     async function actualizarDuracionYInicioDeProyecto(tareas) {
     if (!Array.isArray(tareas) || tareas.length === 0) return;
@@ -381,6 +355,15 @@ async function main() {
     );
     }
 
+
+    /**
+     * Función que toma un proyecto y devuelvo cual es la ultima tarea de sus usuarios en dicho proyecto
+     * 
+     * @param pid identificador único de un proyecto
+     * @param tareas Array de usuarios de la aplicación
+     * 
+    */
+
     function getUsuariosConUltimaTareaEnProyecto(pid, usuarios) {
         const usuariosConTarea = [];
         /*
@@ -406,6 +389,15 @@ async function main() {
 
         return usuariosConTarea;
     }
+
+
+       /**
+     * Función que comprueba si un dia es festivo dentro de un calendario personalizado
+     * 
+     * @param fecha fecha a comprobar si es festiva
+     * @param festivos calendario que contiene los dias festivos y la jornada laboral promedia
+     * 
+    */
 
     function isFestivo(fecha, festivos){
     let count = false;
@@ -434,6 +426,15 @@ async function main() {
     return count;
   }
 
+    /**
+     * Función que cuenta el numero de festivos que transcurre en un periodo
+     * 
+     * @param inicio fecha de inicio del periodo
+     * @param fin fecha de fin del periodo
+     * @param festivos calendario que contiene los dias festivos y la jornada laboral promedia
+     * 
+    */
+
   function contarFestivos(inicio, fin, festivos){
     let count = 0;
     let fechaInicio = new Date(inicio);
@@ -451,7 +452,17 @@ async function main() {
     return count;
   }
 
-    function ajustarTiempoDeFin(horario, tareasProyecto, linksProyecto, offsetInicio){
+    /**
+    * Función que se encarga de actualizar la holgura y duración de un proyecto en función de los retrasos que han afectado al proyecto
+    * 
+    * @param horario estructura que representa el horario laboral
+    * @param tareasProyecto array de tareas del proyecto
+    * @param linksProyecto array de enlaces del proyecto
+    * @param offsetInicio reprensenta el tiempo en milisegundos a desplazar un proyecto si se requiere
+    * 
+    */
+
+  function ajustarTiempoDeFin(horario, tareasProyecto, linksProyecto, offsetInicio){
 
     const horaEntrada = horario[0].entrada;
     const horaSalida  = horario[0].salida;
@@ -465,7 +476,7 @@ async function main() {
         const original_slack = task.slack;
         const W_original = task.duration - task.offtime - task.slack_used; // W (tiempo de la tarea sin complicaciones) antes de tocar nada
 
-       
+       //comprobar tareas predecesoras de la tarea actual.
         let IncomingLinks = linksProyecto.filter((link) => link.target === task.id);
         let startDates = [];
         if (IncomingLinks.length !== 0) {
@@ -488,7 +499,7 @@ async function main() {
             taskAdjustedStartDate = format(new Date(maxMs), "yyyy-MM-dd HH:mm");
         }
 
-        // --- Ajuste de inicio a jornada ---
+        //Ajuste de inicio a jornada
         let fechaInicioTarea = new Date(new Date(taskAdjustedStartDate).getTime() + offsetInicio);
         const horaInicioTarea = fechaInicioTarea.getHours();
         const minutoInicioTarea = fechaInicioTarea.getMinutes();
@@ -503,7 +514,7 @@ async function main() {
             fechaInicioTarea = new Date(fechaInicioTarea.getTime() + 86400000);
         }
 
-        // --- Fin solo con W_original (tu lógica tal cual) ---
+        // Fin con W_original 
         let fechaFinDirecto = new Date(fechaInicioTarea.getTime() + W_original * 60000);
         let fullJournals    = Math.floor(W_original / duracionJornada);
 
@@ -543,17 +554,16 @@ async function main() {
         task.offtime    = offtimeNuevo;
         task.duration   = W_original + offtimeNuevo + task.slack_used;
 
-        // ================================
-        // SEGUNDA NORMALIZACIÓN (clave)
-        // Ajustar si al sumar slack_used el fin cae fuera de jornada o en fin de semana
-        // ================================
+        
+        // SEGUNDA NORMALIZACIÓN Ajustar si al sumar slack_used el fin cae fuera de jornada o en fin de semana
+       
         const finConSlackProvisional = new Date(
             fechaInicioTarea.getTime() + (W_original + offtimeNuevo + task.slack_used) * 60000
         );
 
         let finNormalizado = new Date(finConSlackProvisional);
 
-        // Repetimos el mismo bloque de salto de jornada, con posibilidad de varias iteraciones
+        // Repetimos el mismo bloque de salto de jornada
         while (true) {
             const h = finNormalizado.getHours();
             const m = finNormalizado.getMinutes();
@@ -587,11 +597,21 @@ async function main() {
         task.offtime  = offtimeNuevo + extraPorNormalizar;
         task.duration = W_original + task.slack_used + task.offtime;
 
-        // Blindaje: no tocar slack
+        // Blindamos el slack original
         task.slack = original_slack;
     });
 }
 
+
+    /**
+     * Función que ajusta y comprueba si es necesario ajustar un proyecto debido a retrasos.
+     * 
+     * @param proyect Proyecto que se quiere comprobar si se debe actualizar
+     * @param horario esctructura que representa el horario laboral
+     * @param usuarios usuarios de la aplicación
+     * @param date fecha en la que se quiere comprobar si se debe actualizar las tareas
+     * 
+    */
 
     async function padProyectsSlack(proyect, horario, usuarios, date) {
         const currentMs = date.getTime(); 
@@ -608,7 +628,7 @@ async function main() {
             const offtime   = Number(tarea.offtime)    || 0;
             const oldSlack  = Number(tarea.slack_used) || 0;
 
-            // === Igual que W_original en ajustarTiempoDeFin ===
+            //Igual que W_original en ajustarTiempoDeFin 
             const workTime = tarea.duration - offtime - oldSlack; 
 
             // Fin planificado original (sin slack usado)
@@ -623,38 +643,51 @@ async function main() {
                     proceedFlag = true;
                 }
             }
+        }
+
+        // recalcula inicios y fines con la nueva duración
+        ajustarTiempoDeFin(horario, tareasProyecto, linksProyecto, 0);
+
+        await actualizarTareasEnBD(tareasProyecto);
+        await actualizarDuracionYInicioDeProyecto(tareasProyecto);
+        await actualizarUsuariosConFinDeTareas(tareasProyecto, usuarios);
+
+        return proceedFlag;
     }
-
-    // recalcula inicios y fines con la nueva duración
-    ajustarTiempoDeFin(horario, tareasProyecto, linksProyecto, 0);
-
-    await actualizarTareasEnBD(tareasProyecto);
-    await actualizarDuracionYInicioDeProyecto(tareasProyecto);
-    await actualizarUsuariosConFinDeTareas(tareasProyecto, usuarios);
-
-    return proceedFlag;
-}
     
-    async function actualizarTareasEnBD(tareas) {
-    if (!Array.isArray(tareas) || tareas.length === 0) return;
 
-    await Promise.all(
-        tareas.map(tarea => {
-        return db.collection('tasks').updateOne(
-            { pid: tarea.pid, id: tarea.id },
-            {
-            $set: {
-                start_date: tarea.start_date,
-                duration: tarea.duration,
-                offtime: tarea.offtime,
-                slack_used: tarea.slack_used
-            }
-            }
+    /** Función que actualiza las tareas en la base de datos 
+     * 
+     * @param tareas Arrat de tareas a actualizar en la base de datos
+     * 
+    */
+
+    async function actualizarTareasEnBD(tareas) {
+        if (!Array.isArray(tareas) || tareas.length === 0) return;
+
+        await Promise.all(
+            tareas.map(tarea => {
+            return db.collection('tasks').updateOne(
+                { pid: tarea.pid, id: tarea.id },
+                {
+                $set: {
+                    start_date: tarea.start_date,
+                    duration: tarea.duration,
+                    offtime: tarea.offtime,
+                    slack_used: tarea.slack_used
+                }
+                }
+            );
+            })
         );
-        })
-    );
     }
 
+    /**
+     * Función que cuenta la cantidad de dias en fin de semana que hay entre dos fechas
+     * @param inicio fecha de inicio del periodo
+     * @param fin fecha de fin del periodo
+     * 
+    */
 
     function contarFinesDeSemana(inicio, fin) {
         let contador = 0;
@@ -673,6 +706,14 @@ async function main() {
     }
 
     
+    /**
+     * Función que comprueba que una colección de datos existe en la base de datos
+     * 
+     * @param db base de datos a comprobar
+     * @param name nombre de la colección a comprobar
+     * 
+    */
+
     async function ensureCollection(db, name) {
         const exists = await db.listCollections({ name }, { nameOnly: true }).hasNext();
         if (!exists) {
@@ -680,6 +721,13 @@ async function main() {
             console.log(`Creada colección ${name}`);
         }
     }
+
+        /**
+     * Función que comprueba que las coleeciones de datos existen en la base de datos
+     * 
+     * @param db base de datos a comprobar
+     * 
+    */
 
     async function ensureDatabase(db) {
         const collections = [
@@ -717,12 +765,10 @@ async function main() {
 
 
     /**
-     * DELETE /tasks?pid=<pid>
-     * Borra todas las tareas con el pid especificado.
-     * Responde { deletedCount: N }.
+     * DELETE 
+     * Borra el proyecto con el pid especificado.
+     * @returns  "{deletedCount: N }".
      */
-
-
 
     app.delete('/proyect/delete', async (req, res) => {
 
@@ -740,6 +786,12 @@ async function main() {
         return res.json({ deletedCount: result.deletedCount });
     });
 
+    /**
+     * POST 
+     * Crea un proyecto.
+     * @returns "{ inserted: id }".
+     */
+
     app.post('/proyect/create', async (req, res) =>{
         const toInsert = {id: req.body.id, start: req.body.start, end: req.body.end, title: req.body.title, color: req.body.color};
         
@@ -754,6 +806,11 @@ async function main() {
         }
     });
 
+    /**
+     * GET 
+     * obtiene un proyecto dado el pid.
+     * @returns "{ project }".
+     */
 
     app.get('/proyect', async (req, res) => {
         const pid = parseInt(req.query.pid, 10)
@@ -772,16 +829,34 @@ async function main() {
         }
     });
 
+    /**
+     * DELETE 
+     * Elimina las tareas de un proyecto dado el pid de un proyecto.
+     * @returns "{ deletedCount: N }".
+     */
+
     app.delete('/tasks', parsePid, async (req, res) => {
         const result = await db.collection('tasks').deleteMany({ pid: req.pid });
         res.json({ deletedCount: result.deletedCount });
     });
 
+    /**
+     * DELETE 
+     * Elimina los enlaces de un proyecto dado el pid de un proyecto.
+     * @returns "{ deletedCount: N }".
+     */
     
     app.delete('/links', parsePid, async (req, res) => {
         const result = await db.collection('links').deleteMany({ pid: req.pid });
         res.json({ deletedCount: result.deletedCount });
     });
+
+
+    /**
+     * GET 
+     * Obtiene los usuarios de la base de datos.
+     * @returns "{ users }".
+     */
 
     app.get('/users', async (req, res) => {
         try {
@@ -796,6 +871,12 @@ async function main() {
         }
     });
 
+    /**
+     * DELETE
+     * borra un usuario de la base de datos de la base de datos.
+     * @returns "{ deletedCount: N }".
+     */
+
     app.delete('/user/delete', async (req, res) => {
         try{
             const result = await db.collection('users').deleteOne({ uname: req.query.uname.toString().trim() });
@@ -805,6 +886,12 @@ async function main() {
         }
         
     });
+
+    /**
+     * POST
+     * Actualiza un usuario en la base de datos
+     * @returns {message: usuario actualizado con exito}
+    */
 
     app.post('/user/update', async (req, res) => {
         const { user, update } = req.body;
@@ -845,6 +932,12 @@ async function main() {
         }
     });
 
+    /**
+     * GET
+     * Obtiene un usuario dadas sus credenciales
+     * @returns {user}
+    */
+
     app.get('/users/auth', async (req, res) => {
         const { uname, pass } = req.query;
         if (!uname || !pass) return res.status(400).end();
@@ -864,6 +957,12 @@ async function main() {
         }
     });
 
+    /**
+     * POST
+     * crea un usuario en la base de datos dadas sus credenciales
+     * @returns void
+    */
+
     app.post('/users/create', async (req, res)=>{
         
         const { uname, pass, admin, disponible } = req.body;
@@ -878,6 +977,12 @@ async function main() {
             return res.status(500).json({error: error});
         }
     });
+
+    /**
+     * GET
+     * crea un usuario administrador si no existe ninguno en la base de datos
+     * @returns void
+    */
 
     app.get('/users/admin/ensure', async (req, res) => {
     try {
@@ -918,6 +1023,11 @@ async function main() {
     }
     });
     
+    /**
+     * GET 
+     * Obtiene todos los proyectos de la base de datos
+     * @returns proyects
+    */
 
     app.get('/proyects', async (req, res) => {
         
@@ -932,6 +1042,12 @@ async function main() {
             return res.status(500).json({ error: 'Error interno al leer proyectos' });
         }
     });
+
+    /**
+     * GET 
+     * Obtiene todas las tareas de un proyecto dado su pid
+     * @returns tasks
+    */
 
     app.get('/tasks', async (req, res) => {
         const pid = parseInt(req.query.pid);
@@ -950,22 +1066,34 @@ async function main() {
         }
     });
 
+    /**
+     * GET 
+     * Obtiene todas los enlaces de un proyecto dado su pid
+     * @returns links
+    */
+
     app.get('/links', async (req, res) => {
         const pid = parseInt(req.query.pid);
         if(isNaN(pid)){
             return res.status(400).json({error: 'pid inválido o faltante'});
         }
         try {
-            const proyects = await db
+            const links = await db
             .collection('links')
             .find({pid: pid})
             .toArray();
-            return res.json(proyects);
+            return res.json(links);
         } catch (err) {
             console.error('Error leyendo links:', err);
             return res.status(500).json({ error: 'Error interno al leer enlaces' });
         }
     });
+
+    /**
+     * POST 
+     * Recibe en la request una serie e tareas de un proyecto y las guarda en la base de datos (si ya existen borra las de la base de datos)
+     * @returns "{insertedCount: N,insertedIds: P}"
+    */
 
     app.post('/tasks/batch', async (req, res) => {
         
@@ -1020,68 +1148,79 @@ async function main() {
             return res.status(500).json({ error: 'Error interno al crear tareas en lote' });
         }
     });
+    /**
+     * POST 
+     * recibe en la request una serie de tareas de un proyecto y las actualiza
+     * @returns "{updatedCount: N}"
+    */
 
-
-app.post('/tasks/updateBatch', async (req, res) => {
-    const tasks = req.body;
-    if (!Array.isArray(tasks) || tasks.length === 0) {
-        return res.status(400).json({ error: 'Se espera un array no vacío de tareas' });
-    }
-
-    for (const t of tasks) {
-        t.pid = parseInt(t.pid);
-        t.id = parseInt(t.id);
-        if (
-            typeof t.pid        !== 'number' ||
-            typeof t.id         !== 'number' ||
-            typeof t.text       !== 'string' ||
-            typeof t.start_date !== 'string' ||
-            typeof t.duration   !== 'number' ||
-            typeof t.details    !== 'string' ||
-            typeof t.slack      !== 'number' || // se valida que exista, pero no se usa en update
-            typeof t.slack_used !== 'number' ||
-            typeof t.offtime    !== 'number' ||
-            typeof t.progress   !== 'number' ||
-            !Array.isArray(t.users)
-        ) {
-            return res.status(400).json({
-                error: 'Cada tarea debe tener pid(number), id(number), text(string), start_date(string), duration(number), details(string), slack(number), slack_used(number), offtime(number), progress(number), users(array)'
-            });
+    app.post('/tasks/updateBatch', async (req, res) => {
+        const tasks = req.body;
+        if (!Array.isArray(tasks) || tasks.length === 0) {
+            return res.status(400).json({ error: 'Se espera un array no vacío de tareas' });
         }
-    }
 
-    try {
-        const toUpdate = tasks.map(t => ({
-            pid:        t.pid,
-            id:         t.id,
-            text:       t.text,
-            //start_date: t.start_date,
-            //duration:   t.duration,
-            //details:    t.details ?? "",
-            //offtime:    t.offtime,
-            //slack: t.slack,   <-- INTENCIONALMENTE OMITIDO
-            //slack_used: t.slack_used,
-            progress:   t.progress,
-            users:      t.users
-        }));
+        for (const t of tasks) {
+            t.pid = parseInt(t.pid);
+            t.id = parseInt(t.id);
+            if (
+                typeof t.pid        !== 'number' ||
+                typeof t.id         !== 'number' ||
+                typeof t.text       !== 'string' ||
+                typeof t.start_date !== 'string' ||
+                typeof t.duration   !== 'number' ||
+                typeof t.details    !== 'string' ||
+                typeof t.slack      !== 'number' || // se valida que exista, pero no se usa en update
+                typeof t.slack_used !== 'number' ||
+                typeof t.offtime    !== 'number' ||
+                typeof t.progress   !== 'number' ||
+                !Array.isArray(t.users)
+            ) {
+                return res.status(400).json({
+                    error: 'Cada tarea debe tener pid(number), id(number), text(string), start_date(string), duration(number), details(string), slack(number), slack_used(number), offtime(number), progress(number), users(array)'
+                });
+            }
+        }
 
-        await Promise.all(
-            toUpdate.map(t =>
-                db.collection('tasks').updateOne(
-                    { pid: t.pid, id: t.id },
-                    { $set: t }
+        try {
+            const toUpdate = tasks.map(t => ({
+                pid:        t.pid,
+                id:         t.id,
+                text:       t.text,
+                //start_date: t.start_date,
+                //duration:   t.duration,
+                //details:    t.details ?? "",
+                //offtime:    t.offtime,
+                //slack: t.slack,   <-- INTENCIONALMENTE OMITIDO
+                //slack_used: t.slack_used,
+                progress:   t.progress,
+                users:      t.users
+            }));
+
+            await Promise.all(
+                toUpdate.map(t =>
+                    db.collection('tasks').updateOne(
+                        { pid: t.pid, id: t.id },
+                        { $set: t }
+                    )
                 )
-            )
-        );
+            );
 
-        return res.status(200).json({
-            updatedCount: toUpdate.length
-        });
+            return res.status(200).json({
+                updatedCount: toUpdate.length
+            });
         } catch (err) {
             console.error('Error actualizando batch de tareas:', err);
             return res.status(500).json({ error: 'Error interno al actualizar tareas en lote' });
         }
     });
+
+
+    /**
+     * POST 
+     * recibe en la request una serie de enlaces de un proyecto y los guarda en la base de datos (si ya existen borra los de la base de datos)
+     * @returns "{insertedCount: result.insertedCount,insertedIds:   result.insertedIds}"
+    */
 
 
     app.post('/links/batch', async (req, res) => {
@@ -1133,6 +1272,12 @@ app.post('/tasks/updateBatch', async (req, res) => {
         }
     });
 
+    /**
+     * GET
+     * Obtiene la configuración del calendario desde la base de datos
+     * @returns calendarConfig
+    */
+
     app.get('/calendar/config', async (req, res) =>{
         try{
             const result = await db.collection('calendarConfig').find().toArray();
@@ -1142,6 +1287,13 @@ app.post('/tasks/updateBatch', async (req, res) => {
             return res.status(500).json({error: "Error Interno de Servidor"});
         }
     });
+
+
+    /**
+     * POST
+     * Actualiza la configuración del calendario con el contenido de la request
+     * @returns "{ insertedId: N }"
+    */
 
 
     app.post('/calendar/config/update', async (req, res) => {
@@ -1163,6 +1315,12 @@ app.post('/tasks/updateBatch', async (req, res) => {
         }
     });
 
+    /**
+     * POST
+     * Guarda una plantilla en la base de datos
+     * @returns "{ inserted: id }"
+    */
+
     app.post('/templates/create', async (req, res) =>{
         const toInsert = {id: req.body.id, end: req.body.end, title: req.body.title};
         
@@ -1176,6 +1334,12 @@ app.post('/tasks/updateBatch', async (req, res) => {
             return res.status(500).json({error: error});
         }
     });
+
+    /**
+     * DELETE
+     * Borra una plantilla de la base datos por el id
+     * @returns "{ deletedCount: N }"
+    */
 
     app.delete('/template/delete', async (req, res) => {
         const tid = parseInt(req.query.tid, 10);
@@ -1192,6 +1356,12 @@ app.post('/tasks/updateBatch', async (req, res) => {
         return res.json({ deletedCount: result.deletedCount });
     });
 
+    /**
+     * GET
+     * Obtiene todas las plantillas de la base de datos
+     * @returns templates
+    */
+
     app.get('/templates', async (req, res) => {
         
         try {
@@ -1205,6 +1375,12 @@ app.post('/tasks/updateBatch', async (req, res) => {
             return res.status(500).json({ error: 'Error interno al leer proyectos' });
         }
     });
+
+    /**
+     * GET
+     * Obtiene todas las plantillas de la base de datos
+     * @returns templates
+    */
 
     app.get('/template', async (req, res) => {
         const pid = parseInt(req.query.tid, 10)
@@ -1223,6 +1399,12 @@ app.post('/tasks/updateBatch', async (req, res) => {
         }
     });
 
+    /**
+     * GET
+     * Obtiene todas las tareas de una plantillas de la base de datos según su tid
+     * @returns tasks
+    */
+
     app.get('/template/tasks', async (req, res) => {
         const pid = parseInt(req.query.tid);
         if (isNaN(pid)) {
@@ -1240,6 +1422,12 @@ app.post('/tasks/updateBatch', async (req, res) => {
         }
     });
 
+    /**
+     * GET
+     * Obtiene todos los enlaces de una plantillas de la base de datos según su tid
+     * @returns links
+    */
+
     app.get('/template/links', async (req, res) => {
         const pid = parseInt(req.query.tid);
         if (isNaN(pid)) {
@@ -1256,7 +1444,11 @@ app.post('/tasks/updateBatch', async (req, res) => {
             return res.status(500).json({ error: 'Error interno al leer tareas' });
         }
     });
-
+    /**
+     * DELETE
+     * Elimina todas las tareas de una plantillas de la base de datos según su tid
+     * @returns "{ deletedCount: N }"
+    */
     app.delete('/template/tasks', async (req, res) => {
         
         let tid = parseInt(req.query.tid);
@@ -1268,6 +1460,11 @@ app.post('/tasks/updateBatch', async (req, res) => {
     });
 
     
+    /**
+     * DELETE
+     * Elimina todos los enlaces de una plantillas de la base de datos según su tid
+     * @returns "{ deletedCount: N }"
+    */
     app.delete('/template/links', async (req, res) => {
         
         let tid = parseInt(req.query.tid);
@@ -1278,6 +1475,11 @@ app.post('/tasks/updateBatch', async (req, res) => {
         res.json({ deletedCount: result.deletedCount });
     });
 
+    /**
+     * POST
+     * Guarda un conjunto de tareas de una plantilla seguń su tid, si ya existen se borran las de la base de datos
+     * @returns "{insertedCount: N, insertedIds: P}"
+    */
 
     app.post('/template/tasks/batch', async (req, res) => {
         
@@ -1322,6 +1524,11 @@ app.post('/tasks/updateBatch', async (req, res) => {
         }
     });
 
+    /**
+     * POST
+     * Guarda un conjunto de enlaces de una plantilla seguń su tid, si ya existen se borran las de la base de datos
+     * @returns "{insertedCount: N, insertedIds: P}"
+    */
 
     app.post('/template/links/batch', async (req, res) => {
         const links = req.body;
@@ -1372,45 +1579,23 @@ app.post('/tasks/updateBatch', async (req, res) => {
         }
     });
 
+
+    /**
+     * Función que inicia la escucha de peticiones en el puerto establecido
+     * 
+    */
   app.listen(PORT, () => {
     console.log(`API escuchando en http://localhost:${PORT}`);
   });
 }
 
 
+/**
+ * inicia el bucle principal de ejecución
+*/
 
 main().catch(err => {
   console.error('Error iniciando servidor:', err);
   process.exit(1);
 });
 
-
-    function findAllSuccesors(task, tasksProyect, links) {
-        let succesors = [];
-        let contador = 0;
-        let visitados = new Set();
-
-        let sonLinks = links.filter(link => link.source === task.id);
-        sonLinks.forEach(sonLink => {
-            const found = tasksProyect.find(t => t.id === sonLink.target);
-            if (found) {
-                succesors.push(found);
-                visitados.add(found.id);
-            }
-        });
-
-        while (contador < succesors.length) {
-            const current = succesors[contador];
-            const newLinks = links.filter(link => link.source === current.id);
-            newLinks.forEach(link => {
-                const found = tasksProyect.find(t => t.id === link.target);
-                if (found && !visitados.has(found.id)) {
-                    succesors.push(found);
-                    visitados.add(found.id);
-                }
-            });
-            contador++;
-        }
-
-        return succesors;
-    }

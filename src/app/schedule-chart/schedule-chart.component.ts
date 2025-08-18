@@ -86,10 +86,12 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
       if(this.id !== null){
         if(this.mode === "verProyecto"){
+          // obtenemos los datos del proyecto
           const element = await this.dbDao.GetProyect(this.id).then((proyect: Proyect | any) =>{
             return {id: proyect[0].id, start: proyect[0].start, end: proyect[0].end, title: proyect[0].title, color: proyect[0].color} as Proyect;
           });
           this.nameContent = element.title;
+          // iniciamos el temporizador que refresca las tareas 10 minutos
           this.timerID = window.setInterval(async()=>{
             gantt.clearAll();
                 await this.GetTasksAndLinks(this.id).then(({ TaskList, LinkList }: { TaskList: Task[]; LinkList: Link[] }) => {
@@ -104,10 +106,12 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
           },  10 * 60000);   
         }
         else if(this.mode === 'EditarPlantilla'){
+          // obtenemos los datos de la plantilla
           const element = await this.dbDao.GetTemplate(this.id).then((plantilla:  Plantilla | any)=>{
             return {id: plantilla[0].id, title: plantilla[0].title, end: plantilla[0].end}
           });
           this.nameContent = element.title;
+          //iniciamos el temporizador para calcular el camino crítico del proyecto.
           this.timerID = window.setInterval(()=>{
           this.calculateCriticalPath(gantt.config.start_date as Date);
         }, 350);   
@@ -170,12 +174,14 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
   */
 
   private async initiateGanttForEditTemplate(){
-    
+    // configura la tarea de gantt para añadirle un nuevo campo user_count
     gantt.attachEvent('onTaskCreated',(task: any) => {
       task.user_count = 1;
       return true;
     });
 
+
+    // configuración básica de DHTMLEGantt
     gantt.i18n.setLocale('es');
 
     gantt.config.date_format = '%Y-%m-%d %H:%i';
@@ -191,15 +197,15 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     gantt.templates.scale_cell_class = (() =>{});
 
     gantt.config.scales = [
-  {
-    unit: "day",
-    step: 1,
-    format: date => {
-      return "Día " + (Math.ceil((gantt.columnIndexByDate(date))/24) + 1);
-    }
-  },
-  { unit: "hour", step: 1, format: "%H:%i" }
-];
+    {
+      unit: "day",
+      step: 1,
+      format: date => {
+        return "Día " + (Math.ceil((gantt.columnIndexByDate(date))/24) + 1);
+      }
+    },
+    { unit: "hour", step: 1, format: "%H:%i" }
+  ];
 
     gantt.config.scale_height = 50;
     gantt.config.min_column_width = 45;
@@ -241,6 +247,8 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     ];
 
     gantt.init(this.ganttContainer.nativeElement);
+
+    // obtención de datos de proyecto (enlaces y tareas)
 
     let links = await this.dbDao.GetTemplateLinks(this.id).then((links: LinkPlantilla[])=>{
       return links;
@@ -353,6 +361,10 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
   private async initateGanttForViewProyect(){    
 
+    // configuración básica de DHTMLEGantt
+
+    // configuración de lightBox y bloqueo de creación de nuevas tareas y edición de enlaces.
+
     const horario = await this.dbDao.GetCalendarConfig();
 
     gantt.attachEvent('onLinkDblClick', () => false);
@@ -420,7 +432,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       { unit: 'hour', step: 1, format: '%H:%i' },
       
     ];
-
+    // cambiar color de la barra de la escala horaria a rojo si no es un dia lectivo.
     gantt.config.inherit_scale_class = true;
 
     gantt.templates.scale_cell_class = (date) => {
@@ -445,7 +457,6 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     gantt.config.columns= [
       {name: "text", label: "Titulo", align: "left", width: 150},
       {name: "slack", label: "holgura (mins)", align: "center", width: 120},
-      {name: "slack_used", label: "holgura usada (mins)", align: "center", width: 145}
     ];
 
 
