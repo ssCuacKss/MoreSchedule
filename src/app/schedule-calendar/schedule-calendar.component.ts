@@ -29,7 +29,8 @@ import { Task } from '../DTO/task';
 import { Link } from '../DTO/link';
 import { User } from '../DTO/user';
 import { CookieService } from 'ngx-cookie-service';
-import { Subject } from 'rxjs';
+import { fromEvent, Subject } from 'rxjs';
+import { event } from 'jquery';
 
 
 
@@ -108,7 +109,7 @@ import { Subject } from 'rxjs';
       <h1 style="margin-left: 20px;">Advertencia</h1>
       <button class="closeButton" (click)="cancelAction()">Cancelar</button>
       </div>
-      <h4 style="margin-left: 25px; margin-right:25px">{{confirmDLG}}</h4>
+      <p style="margin-left: 25px; margin-right:25px; font-weight: 500">{{confirmDLG}}</p>
       <div id="optionsCerrarSesion">
         <input type="button" value="Aceptar" id="closeSessionButton" style="margin: 20px;" (click)="performAction()">
       </div>
@@ -151,7 +152,7 @@ import { Subject } from 'rxjs';
         </div>
         <!-- ventana modal  cerrar sesión-->
         <ng-template #cerrarSesion>
-          <h3>{{"Estás a punto de cerrar sesión. ¿Estás seguro?"}}</h3>
+          <h3 style="font-weight: 500">{{"Estás a punto de cerrar sesión. ¿Estás seguro?"}}</h3>
           <div id="optionsCerrarSesion">
             <input type="button" value="Aceptar" id="closeSessionButton" (click)="actionCerrarSesion()">
           </div>
@@ -235,7 +236,7 @@ import { Subject } from 'rxjs';
               </div>
             </div>
           </div>
-          <div class="hidden" #errorMessageAddFechas style="width: 96%;"></div>
+          <div class="hidden" #errorMessageAddFechas style="width: 96%; "></div>
           <div id="saveChangesButtonDiv">
             <input type="button" value="Guardar cambios" id="saveCalendarConfig" #saveCalendarConfig (click)="saveConfig()">
             </div>
@@ -378,6 +379,8 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
   private cdr: ChangeDetectorRef = inject(ChangeDetectorRef);
   //configuracion del calendario a recuperar del servidor
   public calendarConfigData!: CalendarConfig;
+  //configuración del calendario anterior a una actualización
+  private calendarConfigDataOld!: CalendarConfig;
   //plantillas de proyecto recuperadas del servidor
   public plantillas!: Plantilla[];
   //usuarios de la aplicación recuperadas del servidor
@@ -947,7 +950,51 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
   */
 
   public async saveConfig(){
+
+    const msgNoDelete = this.errorMessage4.nativeElement as HTMLElement;
+    const eventNamesActual: {name: string, offdays: number}[] = [];
+    const eventNamesOld: {name: string, offdays: number}[] = [];
+
     const original = await this.dbDao.GetCalendarConfig().then(t => t);
+    this.calendarConfigDataOld = original;
+
+    // obtenemos las festividades por las que pasan los proyectos que pasan por festividades actualmente y en el calendario antiguo
+
+    const proyectosFuturos = this.events.filter( (proyect:any) => {
+            const startTime = new Date(proyect.start).getTime();
+            const endTime = startTime + proyect.end  * 3600000;
+            return new Date().getTime() <= endTime;
+        })
+
+    proyectosFuturos.forEach((event: CalendarEvent)=>{
+      let counterActual = this.contarFestivos(event.start, event.end as Date, false);
+      if(counterActual > 0){
+        eventNamesActual.push({name: event.title, offdays: counterActual});
+      }
+    })
+
+    proyectosFuturos.forEach((event: CalendarEvent)=>{
+      let counterOld = this.contarFestivos(event.start, event.end as Date, true);
+      if(counterOld > 0){
+        eventNamesOld.push({name: event.title, offdays: counterOld});
+      }
+    });
+
+    // comprobamos si en ambos horarios tienen los mismos proyectos o hay cambios en los festivos que pasan
+
+    const changesInProyectFestivities = () => {
+      if(eventNamesOld.length !== eventNamesActual.length){
+        return true;
+      }else{
+        for(let i = 0; i < eventNamesActual.length ; i++){
+          if(eventNamesActual[i].name !== eventNamesOld[i].name || eventNamesActual[i].offdays !== eventNamesOld[i].offdays){
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
 
     const entrada = (this.entrada.nativeElement as HTMLInputElement).value;
     const salida = (this.salida.nativeElement as HTMLInputElement).value;
@@ -956,14 +1003,30 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
       this.calendarConfigData.entrada = entrada;
       this.calendarConfigData.salida = salida;
     }
-    
-    if(original.entrada !== this.calendarConfigData.entrada || original.salida !== original.salida || this.differencesInDates(this.calendarConfigData.festivos, original.festivos)){
-      const ok = await this.openDialog("Está a punto de guardar los cambios en el horario, ¿Está seguro?");
-      if(!ok) return;
+
+    // comprobamos si hay motivos para guardar los cambios y avisamos al usuario
+
+    let msg = "Está a punto de guardar los cambios en el horario, ¿Está seguro?";
+    if (original.entrada !== this.calendarConfigData.entrada ||original.salida !== this.calendarConfigData.salida || this.differencesInDates(this.calendarConfigData.festivos, original.festivos)){
+      // se notifica al usuario si existe riesgo de cambiar la planificación actual de los proyectos en caso de hacer cambios en las festividades 
+      if(changesInProyectFestivities()){
+        msg += " Los cambios en los periodos festivos afectarán a la planificación de proyectos existentes";
+      }
+
+      const ok = await this.openDialog(msg);
+      if(!ok){ 
+        msgNoDelete.className = "hidden";
+        msgNoDelete.innerText = "";  
+        return;
+      };
     }
 
     await this.dbDao.updateCalendarConfigPromise(this.calendarConfigData);
-    this.refresh.next();
+
+    msgNoDelete.className = "validMessage";
+    msgNoDelete.innerText = `Los cambios fueron guardados correctamente`;
+    
+    await this.refreshData();
   }
 
     private differencesInDates(array1: any[], array2: any[]): boolean{
@@ -1021,7 +1084,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
         eventNames.push(event.title);
       }
     })
-
+    /* 
     if(eventNames.length === 1){
       msgNoDelete.className = "errorMessage";
       msgNoDelete.innerText = `No se puede borrar el periodo, un proyecto pasa por el.`;
@@ -1030,7 +1093,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
       msgNoDelete.className = "errorMessage";
       msgNoDelete.innerText = `No se puede borrar el periodo, ${eventNames.length} proyectos pasa por el.`;
     }
-
+    */
     const listIndex = parseInt((event.target as HTMLElement).id);
     this.calendarConfigData.festivos.splice(listIndex, 1);
   }
@@ -1816,18 +1879,20 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
   }
 
   /**
-   * Función que comprueba si una fecha concreta cae en un dia festivo de un calendario personalizado.
+   * Función que comprueba si una fecha concreta cae en un dia festivo del calendario de la aplicación.
    * 
-   * @param {Date} fecha fecha que deseamos comprobar
-   * @param {CalendarConfig} festivos calendario que contiene el listado de festivos de la aplicación 
+   * @param {Date} fecha fecha que deseamos comprobarn 
+   * @param {boolean} oldFlag indica si se debe usar la configuración actual (false) o antigua (true), false por defecto
    * 
    * @returns {boolean} comprobante para verificar que dicho dia es festivo.
    * 
   */
 
-  private isFestivo(fecha: Date): boolean{
+  private isFestivo(fecha: Date, oldFlag: boolean = false): boolean{
     let count = false;
-    for(let festivo of this.calendarConfigData.festivos){
+    const festivos = oldFlag ? this.calendarConfigDataOld.festivos : this.calendarConfigData.festivos;
+
+    for(let festivo of festivos){
       
       const diaInicio = new Date(festivo.diaInicio);
       diaInicio.setHours(0,0,0,0);
@@ -1853,23 +1918,24 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
   }
 
   /**
-   * Función que que cuenta los dias que una fecha o periodo concreto atraviesa un dia festivo de un calendario personalizado.
+   * Función que que cuenta los dias que una fecha o periodo concreto atraviesa un dia festivo del calendario de la aplicación.
    * 
    * @param {Date} inicio fecha de inicio del periodo que deseamos comprobar
    * @param {Date} fin fecha de finalización que deseamos comprobar
+   * @param {boolean} oldFlag indica si se debe usar la configuración actual (false) o antigua (true), false por defecto
    * 
    * @returns {number} Cantidad de dias festivos atravesados.
    * 
   */
 
-  private contarFestivos(inicio: Date, fin: Date): number{
+  private contarFestivos(inicio: Date, fin: Date, oldFlag: boolean = false): number{
     let count = 0;
     let fechaInicio = new Date(inicio);
     fechaInicio.setHours(0,0,0,0);
     let fechaFin = new Date(fin);
     fechaFin.setHours(0,0,0,0);
     while(fechaInicio <= fechaFin){
-      const esFestivo = this.isFestivo(fechaInicio);
+      const esFestivo = this.isFestivo(fechaInicio, oldFlag);
       if(esFestivo){
         count++
       }

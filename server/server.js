@@ -73,6 +73,9 @@ async function main() {
             console.error('UNEXPECTED ERROR ON ADJUSTMENT EXECUTION', error);
         }
     },MINUTES_INTERVAL * 60000)
+
+    //await updateProyectosEnFestivos();
+
     
     /**
      * Función que obtiene la ultima fecha de ejecución del ajuste de tareas de la base de datos
@@ -118,6 +121,52 @@ async function main() {
         next();
     }
 
+    /**
+     * Reajusta los proyectos futuros de la aplicación si se ha añadido o eliminado un festivo que interfiera con la finalización del proyecto
+     * 
+     * 
+    */
+
+    async function updateProyectosEnFestivos(){
+        
+        const currentDate = new Date();
+
+        let horario = await db.collection('calendarConfig').find().toArray();
+
+        // se seleccionan y filtran los proyectos cuya fecha de finalización es posterior a la fecha actual
+        const proyectos = await db.collection('proyects').find().toArray();
+        const proyectosFuturos = proyectos.filter( proyect => {
+            const startTime = new Date(proyect.start).getTime();
+            const endTime = startTime + proyect.end * 3600000;
+            return currentDate <= endTime;
+        })
+
+
+        proyectosFuturos.sort((a, b) => new Date(a.start) - new Date(b.start));
+
+        let usuarios = await db.collection('users').find().toArray();
+        
+        // se recorren todos los proyectos futuros para ajustarlos si se ha borrado una fecha
+
+        for(let i = 0; i < proyectosFuturos.length; i++){
+            let proyecto = proyectosFuturos[i];
+            const tareasProyecto = await db.collection('tasks').find({ pid: proyecto.id }).toArray();
+            const linksProyecto  = await db.collection('links').find({ pid: proyecto.id }).toArray();
+
+            ajustarTiempoDeFin(horario,tareasProyecto,linksProyecto,0);
+
+            // se actualizan las tareas si han visto su duración modificada
+            actualizarTareasEnBD(tareasProyecto);   
+            // se actualiza la duración del proyecto en la base de datos
+            actualizarDuracionYInicioDeProyecto(tareasProyecto);
+            // se actualizan los usuarios con la información de las tareas del siguiente proyecto actualizadas.
+            actualizarUsuariosConFinDeTareas(tareasProyecto, usuarios)
+            
+        }
+        // se guardan los usuarios actualizados tras finalizar el reajuste
+        guardarUsuariosActualizados(usuarios);
+
+    }
 
     /**
      * Función que ajusta las tareas por su holgura y colisión con otras tareas en función de la fecha actual
@@ -1317,11 +1366,15 @@ async function main() {
     app.post('/calendar/config/update', async (req, res) => {
     const newConfig = req.body;
         try {
-            // 1) Eliminamos cualquier documento anterior
+            // Eliminamos cualquier documento anterior
             await db.collection('calendarConfig').deleteMany({});
 
-            // 2) Inserción de la nueva configuración
+            // Inserción de la nueva configuración
             const result = await db.collection('calendarConfig').insertOne(newConfig);
+
+            // Reajustamos los proyectos ya que puede haber borrado un festivo en medio de un proyecto
+            
+            await updateProyectosEnFestivos();
 
             // 201 Created con el ID del insertado
             return res.status(201).json({ insertedId: result.insertedId });
