@@ -3,7 +3,7 @@
  * Nombre del archivo: dbDAO.ts
  * Descripción: Servicio encargado de la creación, edición, eliminación y visualizacion de los datos necesarios.
  * para la operación normal de la app Obteniendo los datos de una API
- * Autor: Pablo Roldan Pueba <i92ropup@uco.es>
+ * Autor: Pablo Roldan Puebla <i92ropup@uco.es>
  * Fecha de creación: 29/04/2025
  * Última modificación: 18/08/2025
  * ------------------------------------------------------------------------------------------------------------

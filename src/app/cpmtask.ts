@@ -3,7 +3,7 @@
  * Nombre del archivo: cmptask.ts
  * Descripción: Interfaz que representa un una tarea de un proyecto y los datos necesarios para el 
  * cálculo del camino crítico.
- * Autor: Pablo Roldan Pueba <i92ropup@uco.es>
+ * Autor: Pablo Roldan Puebla <i92ropup@uco.es>
  * Fecha de creación: 20/04/2025
  * Última modificación: 18/08/2025
  * ------------------------------------------------------------------------------------------------------------

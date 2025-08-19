@@ -3,7 +3,7 @@
  * Nombre del archivo: task.ts
  * Descripción: Fichero que especifica la interfaz para los datos una tarea de un proyecto
  * servida por el backend de la aplicación. Fácilmente interpretable por el sistema
- * Autor: Pablo Roldan Pueba <i92ropup@uco.es>
+ * Autor: Pablo Roldan Puebla <i92ropup@uco.es>
  * Fecha de creación: 25/04/2025
  * Última modificación: 19/08/2025
  * ------------------------------------------------------------------------------------------------------------

@@ -3,7 +3,7 @@
  * Nombre del archivo: link-plantilla.ts
  * Descripción: Fichero que especifica la interfaz para los datos de los enlaces entre tareas de una plantilla
  * servidos por el backend de la aplicación. Fácilmente interpretable por el sistema
- * Autor: Pablo Roldan Pueba <i92ropup@uco.es>
+ * Autor: Pablo Roldan Puebla <i92ropup@uco.es>
  * Fecha de creación: 23/04/2025
  * Última modificación: 19/08/2025
  * ------------------------------------------------------------------------------------------------------------

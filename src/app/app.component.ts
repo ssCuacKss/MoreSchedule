@@ -2,6 +2,7 @@
  * ------------------------------------------------------------------------------------------------------------
  * Nombre del archivo: app.component.ts
  * Descripción: Componente encargado de insertar y presentar las diferentes vistas de la aplicación
+ * Autor: Pablo Roldan Puebla <i92ropup@uco.es>
  * Fecha de creación: 18/04/2025
  * Última modificación: 18/08/2025
  * ------------------------------------------------------------------------------------------------------------

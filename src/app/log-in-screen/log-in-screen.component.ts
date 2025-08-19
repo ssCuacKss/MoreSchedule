@@ -1,3 +1,14 @@
+/**
+ * ------------------------------------------------------------------------------------------------------------
+ * Nombre del archivo: log-in-screen.component.ts
+ * Descripción: Componente encargado de la vista de visualización y modificación de proyectos y plantillas en tablas gantt.
+ * Autor: Pablo Roldan Puebla <i92ropup@uco.es>
+ * Fecha de creación: 19/04/2025
+ * Última modificación: 18/08/2025
+ * ------------------------------------------------------------------------------------------------------------
+ */
+
+
 import { Component, ElementRef, inject} from '@angular/core';
 import { Router } from '@angular/router';
 import { FormGroup, FormControl } from '@angular/forms';
@@ -7,8 +18,6 @@ import { CookieService } from 'ngx-cookie-service';
 import { dbDAO } from '../dbDAO';
 import { ViewChild } from '@angular/core';
 import { User } from '../DTO/user';
-
-
 
 
 

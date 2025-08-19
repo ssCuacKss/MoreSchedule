@@ -2,7 +2,7 @@
  * ------------------------------------------------------------------------------------------------------------
  * Nombre del archivo: routes.ts
  * Descripción: Fichero que especifica las rutas de navegación dentro de la SPA.
- * Autor: Pablo Roldan Pueba <i92ropup@uco.es>
+ * Autor: Pablo Roldan Puebla <i92ropup@uco.es>
  * Fecha de creación: 20/04/2025
  * Última modificación: 18/08/2025
  * ------------------------------------------------------------------------------------------------------------

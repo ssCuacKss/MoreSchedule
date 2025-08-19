@@ -2,7 +2,7 @@
  * ------------------------------------------------------------------------------------------------------------
  * Nombre del archivo: schedule-chart.component.ts
  * Descripción: Componente encargado de la vista de visualización y modificación de proyectos y plantillas en tablas gantt.
- * Autor: Pablo Roldan Pueba <i92ropup@uco.es>
+ * Autor: Pablo Roldan Puebla <i92ropup@uco.es>
  * Fecha de creación: 19/04/2025
  * Última modificación: 18/08/2025
  * ------------------------------------------------------------------------------------------------------------

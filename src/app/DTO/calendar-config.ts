@@ -3,7 +3,7 @@
  * Nombre del archivo: calendar-config.ts
  * Descripción: Fichero que especifica la interfaz para los datos de configuración del calendario servidos
  * por el backend de la aplicación. Fácilmente interpretable por el sistema
- * Autor: Pablo Roldan Pueba <i92ropup@uco.es>
+ * Autor: Pablo Roldan Puebla <i92ropup@uco.es>
  * Fecha de creación: 30/04/2025
  * Última modificación: 18/08/2025
  * ------------------------------------------------------------------------------------------------------------
