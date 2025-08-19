@@ -361,7 +361,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
   //fecha en la que iniciar el calendario
   public viewDate: Date = new Date();
   //comprobante para abrir los proyectos de un dia
-  public activeDayIsOpen: boolean = true;
+  public activeDayIsOpen: boolean = false;
   //servicio del DOM
   private document: Document = inject(DOCUMENT);
   //servicio de router de angular
@@ -471,6 +471,9 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
       const hasWarn  = titles.some(t => t.includes('⚠️'));
 
       (day as any).emoji = hasBlock ? '⛔' : (hasWarn ? '⚠️' : ''); 
+
+      const extra = (hasBlock ? ' has-block' : (hasWarn ? ' has-warn' : ''));
+      day.cssClass = (day.cssClass || '') + extra;
   
       const fechaCelda = new Date(day.date);
       fechaCelda.setHours(0, 0, 0, 0);

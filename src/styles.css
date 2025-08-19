@@ -1,16 +1,16 @@
 body{
     margin: 0;
 }
-.cal-month-view .cal-day-cell:has(.cal-event[title*="⛔"]) .cal-day-badge::after {
-  content: " ⛔";
+.cal-month-view .cal-day-cell.has-block .cal-day-badge::after { 
+  content: " ⛔"; 
 }
 
-.cal-month-view .cal-day-cell:not(:has(.cal-event[title*="⛔"])):has(.cal-event[title*="⚠️"]) .cal-day-badge::after {
-  content: " ⚠️";
+.cal-month-view .cal-day-cell.has-warn  .cal-day-badge::after { 
+  content: " ⚠️"; 
 }
 
 .cal-month-view .festivo-day .cal-day-number {
-  color: #891d1b; /* mismo rojo clarito que fines de semana */
+  color: #891d1b; /* mismo rojo que fines de semana para entender que son dias no laborales */
   font-weight:300;
 }
 
