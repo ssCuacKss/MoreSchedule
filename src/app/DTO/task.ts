@@ -1,4 +1,15 @@
 /**
+ * ------------------------------------------------------------------------------------------------------------
+ * Nombre del archivo: task.ts
+ * Descripción: Fichero que especifica la interfaz para los datos una tarea de un proyecto
+ * servida por el backend de la aplicación. Fácilmente interpretable por el sistema
+ * Autor: Pablo Roldan Pueba <i92ropup@uco.es>
+ * Fecha de creación: 25/04/2025
+ * Última modificación: 19/08/2025
+ * ------------------------------------------------------------------------------------------------------------
+ */
+
+/**
  * Intefaz para los datos de las Tareas de una plantilla.
  * 
  * @interface Plantilla

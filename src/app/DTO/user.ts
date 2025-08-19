@@ -1,4 +1,16 @@
 /**
+ * ------------------------------------------------------------------------------------------------------------
+ * Nombre del archivo: user.ts
+ * Descripción: Fichero que especifica la interfaz para los datos un usuario de la aplicación
+ * servido por el backend de la aplicación. Fácilmente interpretable por el sistema
+ * Autor: Pablo Roldan Pueba <i92ropup@uco.es>
+ * Fecha de creación: 21/04/2025
+ * Última modificación: 19/08/2025
+ * ------------------------------------------------------------------------------------------------------------
+ */
+
+
+/**
  * Intefaz para los datos de los usuarios de la aplicación y las tareas a las que están asociados.
  * 
  * @interface User

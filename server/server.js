@@ -1,7 +1,7 @@
 /**
  * ----------------------------------------------------------------------------------------------------------------
  * Nombre del archivo: server.ts
- * Descripción: Servidor de la aplicación, expone una API RESTFull que realiza operaciones crud sobre los datos
+ * Descripción: Servidor de la aplicación, expone una API RESTFull que realiza operaciones CRUD sobre los datos
  * almacenados en una base de datos. tambine realiza calculos cíclicos que liberan al cliente de ese tipo de cargas
  * Autor: Pablo Roldan Pueba <i92ropup@uco.es>
  * Fecha de creación: 30/04/2025
