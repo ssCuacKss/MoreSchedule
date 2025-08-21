@@ -201,7 +201,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
   private async initiateGanttForEditTemplate(){
     // configura la tarea de gantt para añadirle un nuevo campo user_count
     gantt.attachEvent('onTaskCreated',(task: any) => {
-      task.user_count = 1;
+      task.user_count = 1 as number;
       return true;
     });
 
@@ -660,12 +660,15 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
       const curOffsetHours = (new Date(cur.start_date as any).getTime() - baseMs) / 3600000;
 
+      console.log(cur.text !== db.text, cur.duration !== db.duration, cur.user_count != db.user_count , curOffsetHours !== db.start_date)
+
       if (
         cur.text !== db.text ||
         cur.duration !== db.duration ||
-        Number(cur.user_count) !== db.user_count ||
+        cur.user_count != db.user_count ||
         curOffsetHours !== db.start_date
       ) {
+        console.log("he entrado en este bloque y no se ni como");
         return true;
       }
     }
@@ -677,10 +680,12 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     }
 
     for (let i = 0; i < links.length; i++) {
+      console.log(links[i].source != LinkList[i].source, links[i].target != LinkList[i].target)
       if (
-        links[i].source !== LinkList[i].source ||
-        links[i].target !== LinkList[i].target
+        links[i].source != LinkList[i].source ||
+        links[i].target != LinkList[i].target
       ) {
+        console.log("he entrado en este bloque 2 y no se ni como");
         return true;
       }
     }

@@ -56,9 +56,9 @@ async function main() {
     //Recuperación de ajuste por caidas del servidor
 
     if(timeGap > ((3 * MINUTES_INTERVAL * 60000))){
-        let intervals = Math.floor(timeGap / (3 * MINUTES_INTERVAL * 60000));
+        let intervals = Math.floor(timeGap / (2 * MINUTES_INTERVAL * 60000));
         for(let i = 1; i <= intervals ; i++){
-            let nextDateToExecute = new Date(lastExecutionDate.getTime() + 3 * i * MINUTES_INTERVAL * 60000);
+            let nextDateToExecute = new Date(lastExecutionDate.getTime() + 2 * i * MINUTES_INTERVAL * 60000);
             await checkChangeOnCalendarProyectDuration(nextDateToExecute);
         }
     }else{
