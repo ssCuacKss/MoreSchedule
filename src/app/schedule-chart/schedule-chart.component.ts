@@ -153,21 +153,40 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
       window.clearInterval(this.timerID);
   }
 
-  /** Funciones encargadas de abrir la ventana de dialogo para confirmar o cancelar acciones*/
+  /** Funciones encargada de abrir confirmar o cancelar acciones*/
 
   private dialogResolver?: (v: boolean) => void;
+
+        /** 
+   * 
+   * Función que muestra la ventana de diálogo.
+   * @param {string} msg mensaje de texto a mostrar en la ventana
+   */
+
 
   public async openDialog(msg: string): Promise<boolean> {
     this.confirmDLG = msg;
     (this.dialog.nativeElement as HTMLElement).className = 'dialogPanel';
     return new Promise<boolean>(resolve => (this.dialogResolver = resolve));
   }
+        /** 
+   * 
+   * Función para devolver resultado negativo en la ventana de diálogo
+   * 
+   */
+
 
   public cancelAction() {
     (this.dialog.nativeElement as HTMLElement).className = 'dialogDisabled';
     this.dialogResolver?.(false);
     this.dialogResolver = undefined;
   }
+        /** 
+   * 
+   * Función para devolver resultado positivo en la ventana de diálogo
+   * 
+   */
+
 
   public performAction() {
     (this.dialog.nativeElement as HTMLElement).className = 'dialogDisabled';

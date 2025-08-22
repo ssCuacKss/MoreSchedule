@@ -647,11 +647,18 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
   /** 
    * 
-   * Función para generar la ventana de dialogo y acciones de sus botones
+   * Función para generar el resultado de la ventana de acciones de sus botones
    * 
    */
 
   private dialogResolver?: (v: boolean) => void;
+
+    /** 
+   * 
+   * Función para mostrar la ventana de diálogo.
+   * @param {string} msg mensaje de texto a mostrar en la ventana de dialogo
+   * 
+   */
 
   public async openDialog(msg: string): Promise<boolean> {
     this.confirmDLG = msg;
@@ -659,11 +666,23 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
     return new Promise<boolean>(resolve => (this.dialogResolver = resolve));
   }
 
+      /** 
+   * 
+   * Función para devolver resultado negativo en la ventana de diálogo
+   * 
+   */
+
   public cancelAction() {
     (this.dialog.nativeElement as HTMLElement).className = 'dialogDisabled';
     this.dialogResolver?.(false);
     this.dialogResolver = undefined;
   }
+
+       /** 
+   * 
+   * Función para devolver resultado positivo en la ventana de diálogo
+   * 
+   */
 
   public performAction() {
     (this.dialog.nativeElement as HTMLElement).className = 'dialogDisabled';
