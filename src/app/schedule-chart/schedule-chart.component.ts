@@ -4,7 +4,7 @@
  * Descripción: Componente encargado de la vista de visualización y modificación de proyectos y plantillas en tablas gantt.
  * Autor: Pablo Roldan Puebla <i92ropup@uco.es>
  * Fecha de creación: 19/04/2025
- * Última modificación: 18/08/2025
+ * Última modificación: 21/08/2025
  * ------------------------------------------------------------------------------------------------------------
  */
 
@@ -660,7 +660,6 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
       const curOffsetHours = (new Date(cur.start_date as any).getTime() - baseMs) / 3600000;
 
-      console.log(cur.text !== db.text, cur.duration !== db.duration, cur.user_count != db.user_count , curOffsetHours !== db.start_date)
 
       if (
         cur.text !== db.text ||
@@ -668,7 +667,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
         cur.user_count != db.user_count ||
         curOffsetHours !== db.start_date
       ) {
-        console.log("he entrado en este bloque y no se ni como");
+        
         return true;
       }
     }
@@ -685,7 +684,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
         links[i].source != LinkList[i].source ||
         links[i].target != LinkList[i].target
       ) {
-        console.log("he entrado en este bloque 2 y no se ni como");
+        
         return true;
       }
     }
