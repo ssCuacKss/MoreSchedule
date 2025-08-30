@@ -26,9 +26,10 @@ import { User } from '../DTO/user';
   imports: [ReactiveFormsModule, CommonModule],
   standalone: true,
   template: `
-    <div class="loginInfo">
+    <div class="loginInfo" >
       <!-- formaulario de datos de usuario-->
       <form [formGroup]="loginInfo">
+        <img src="moreschedule.png" alt="logo moreschedule" id="logoHolder">
         <label for="areaTextoUsuario">Usuario</label>
         <input type="text" placeholder="Ejemplo: pablo (solo se admiten minusculas)" name="Usuario" id="areaTextoUsuario" formControlName="userName">
         <label for="areaTextoPass">Contraseña</label>

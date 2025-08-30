@@ -43,25 +43,25 @@ import { event } from 'jquery';
       <!-- barra de menu -->
       <div class="menu" (mouseleave)="closeAllSubmenus($event)" #nav>
         <ul class="calendarMenu">
-          <li (click)="openMenu($event)" class="item" id="menu-one">Proyectos
+          <li (click)="openMenu($event)" class="item" id="menu-one">Gestión de proyectos
             <ul class="closed">
               <li (click)="selectOption('NuevoProyecto')">Nuevo Proyecto</li>
               <!--<li (click)="selectOption('NuevoProyectoSP')">Nuevo Proyecto sin Plantilla</li>-->
             </ul>
           </li>
-          <li (click)="openMenu($event)" class="item" id="menu-two">Plantillas
+          <li (click)="openMenu($event)" class="item" id="menu-two">Plantillas de proyectos
             <ul class="closed">
               <li (click)="generarNuevaPlantilla()">Nueva Plantilla</li>
               <li (click)="selectOption('EditarPlantilla')">Editar Plantilla</li>
             </ul>
           </li>
-          <li (click)="openMenu($event)" class="item" id="menu-three">Usuarios
+          <li (click)="openMenu($event)" class="item" id="menu-three">Gestión de usuarios
             <ul class="closed" >
               <li (click)="selectOption('CrearUsuario')">Crear Usuario</li>
               <li (click)="selectOption('EditarUsuario')">Editar Usuario</li>
             </ul>
           </li>
-          <li (click)="selectOption('CalendarConfig')" class="item" id="menu-four">Calendario</li>
+          <li (click)="selectOption('CalendarConfig')" class="item" id="menu-four">Configuración de calendario</li>
           <li (click)="selectOption('CerrarSesion')" class="item" id="menu-five">Cerrar Sesión</li>
         </ul>
       </div>
