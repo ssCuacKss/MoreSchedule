@@ -5,7 +5,7 @@
  * para la operación normal de la app Obteniendo los datos de una API
  * Autor: Pablo Roldan Puebla <i92ropup@uco.es>
  * Fecha de creación: 29/04/2025
- * Última modificación: 18/08/2025
+ * Última modificación: 01/09/2025
  * ------------------------------------------------------------------------------------------------------------
  */
 
@@ -16,14 +16,14 @@ import { CalendarEvent } from 'angular-calendar';
 import { Proyect } from './DTO/proyect';
 import { Task } from './DTO/task';
 import { Link } from './DTO/link';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient} from '@angular/common/http';
 import { Observable, lastValueFrom} from 'rxjs';
 import {map} from 'rxjs/operators'
 import { CalendarConfig } from './DTO/calendar-config' ;
 import { Plantilla } from './DTO/plantilla';
 import { TareaPlantilla } from './DTO/tarea-plantilla';
 import { LinkPlantilla } from './DTO/link-plantilla';
-import { Calendar } from 'dhtmlx-gantt';
+import { CookieService } from 'ngx-cookie-service';
 
 @Injectable({
   providedIn: 'root'
@@ -35,8 +35,10 @@ import { Calendar } from 'dhtmlx-gantt';
  * 
 */
 export class dbDAO {
-
+  //instancia del servicio que administra peticiones http salientes
   private http: HttpClient = inject(HttpClient);
+  //instancia del servicio que administra las cookies de la aplicación
+  private cookieService: CookieService = inject(CookieService);
 
   constructor() { }
 
@@ -48,6 +50,7 @@ export class dbDAO {
    * @returns comprobante de la existencia del usuario
    * 
   */
+
 
   public async GetUser(uname: string, pass: string): Promise<{user: User, token: string} | undefined> {
     const params = new URLSearchParams({
@@ -65,6 +68,20 @@ export class dbDAO {
   }
 
   /**
+   * Función encargada de comprobar la validez del token de acceso a la API
+   * 
+   * @returns {{authorization: boolean}} comprobante de la validez del token
+  */
+
+  public async getAuth(): Promise<{authorization: boolean}>{
+    const params = new URLSearchParams({
+      token: this.cookieService.get("LoginCookie")
+    });
+    const res = await fetch(`http://localhost:3000/users/token/auth?${params}`);
+    return await res.json();
+  }
+
+  /**
    * Función encargada de obtener todos los usuarios de la aplicación.
    * 
    * 
@@ -73,8 +90,10 @@ export class dbDAO {
    * 
   */
   public async GetUsers(): Promise<User[]> {
-    
-    const res = await fetch(`http://localhost:3000/users`);
+    const params = new URLSearchParams({
+      token: this.cookieService.get("LoginCookie")
+    });
+    const res = await fetch(`http://localhost:3000/users?${params}`);
     if (res.status === 200) {
       return await res.json() as User[];
     }
@@ -92,7 +111,10 @@ export class dbDAO {
   */
   
   public async createUser(user: User): Promise<any> {
-    return await lastValueFrom(this.http.post<any>("http://localhost:3000/users/create",
+    const params = new URLSearchParams({
+      token: this.cookieService.get("LoginCookie")
+    });
+    return await lastValueFrom(this.http.post<any>(`http://localhost:3000/users/create?${params}`,
       user))
   }
 
@@ -105,7 +127,8 @@ export class dbDAO {
   public async deleteUser(user: User):Promise<any>{
     const params = new URLSearchParams({
       uname: user.uname,
-      pass: user.pass
+      pass: user.pass,
+      token: this.cookieService.get("LoginCookie")
     });
     return await lastValueFrom(this.http.delete<any>(`http://localhost:3000/user/delete?${params}`))
   }
@@ -125,7 +148,10 @@ export class dbDAO {
       user: user,
       update: update
     };
-    return await lastValueFrom(this.http.post<any>(`http://localhost:3000/user/update`, body))
+    const params = new URLSearchParams({
+      token: this.cookieService.get("LoginCookie")
+    });
+    return await lastValueFrom(this.http.post<any>(`http://localhost:3000/user/update?${params}`, body))
   }
 
 
@@ -137,7 +163,10 @@ export class dbDAO {
   */
 
   public async GetCalendarConfig():Promise<CalendarConfig>{
-    const data = (await fetch("http://localhost:3000/calendar/config")).json();
+    const params = new URLSearchParams({
+      token: this.cookieService.get("LoginCookie")
+    });
+    const data = (await fetch(`http://localhost:3000/calendar/config?${params}`)).json();
     return data;
   }
 
@@ -153,9 +182,10 @@ export class dbDAO {
 
   public async GetProyect(Pid: number): Promise<Proyect | undefined> {
     const params = new URLSearchParams({
-      pid: Pid.toString() 
+      pid: Pid.toString(),
+      token: this.cookieService.get("LoginCookie")
     });
-    const res = await fetch("http://localhost:3000/proyect?pid=" + Pid);
+    const res = await fetch(`http://localhost:3000/proyect?${params}`);
     if (res.status === 200) {
       return await res.json() as Proyect;
     }
@@ -172,7 +202,12 @@ export class dbDAO {
   */
   public async GetTemplate(Tid: number): Promise<Plantilla | undefined> {
 
-    const res = await fetch("http://localhost:3000/template?tid=" + Tid);
+    const params = new URLSearchParams({
+      tid: Tid.toString(),
+      token: this.cookieService.get("LoginCookie")
+    });
+
+    const res = await fetch(`http://localhost:3000/template?${params}`);
     if (res.status === 200) {
       return await res.json() as Plantilla;
     }
@@ -188,11 +223,14 @@ export class dbDAO {
   */
   public async GetTemplates(): Promise<Plantilla[]>{
 
-    let data = await fetch("http://localhost:3000/templates");
+    const params = new URLSearchParams({
+      token: this.cookieService.get("LoginCookie")
+    });
+
+    let data = await fetch(`http://localhost:3000/templates?${params}`);
 
     let plantillas: Plantilla[] = (await data.json()) as Plantilla[];
      
-    let calendarEvents: CalendarEvent[] = [];
 
 
     return plantillas ?? [] ;
@@ -210,7 +248,12 @@ export class dbDAO {
 
   public async GetProyectTasks(id: number): Promise<Task[]>{
 
-    let data = await fetch("http://localhost:3000/tasks?pid=" + id);
+    const params = new URLSearchParams({
+      pid: id.toString(),
+      token: this.cookieService.get("LoginCookie")
+    });
+
+    let data = await fetch(`http://localhost:3000/tasks?${params}`);
     let tasks = await data.json();
     let parsedTasks: Task [] = [];
     tasks.forEach((task: Task) => {
@@ -244,7 +287,12 @@ export class dbDAO {
 
   public async GetProyectLinks(id: number): Promise<Link[]>{
 
-    let data = await fetch("http://localhost:3000/links?pid=" + id);
+    const params = new URLSearchParams({
+      pid: id.toString(),
+      token: this.cookieService.get("LoginCookie")
+    });
+
+    let data = await fetch(`http://localhost:3000/links?${params}`);
     let Links = await data.json();
     let parsedLinks: Link [] = [];
     Links.forEach((link: any) => {
@@ -272,6 +320,8 @@ export class dbDAO {
   */
 
   public async SaveProyectTasksandLinks(pid: number, tasks: any[], rels:  any[]): Promise<void> {
+
+    
     const cleanTasks = tasks;
   
     const cleanRels  = rels; 
@@ -329,10 +379,14 @@ export class dbDAO {
   */
 
   public async createProyect(proyect: Proyect): Promise<void> {
+
+    const params = new URLSearchParams({
+      token: this.cookieService.get("LoginCookie")
+    });
   
     await lastValueFrom(
       this.http.post<number>(
-        'http://localhost:3000/proyect/create',
+        `http://localhost:3000/proyect/create?${params}`,
         proyect
       )
     );
@@ -348,8 +402,11 @@ export class dbDAO {
   */
 
   public createTasksBatch(tasks: Task[]): Observable<number> {
+    const params = new URLSearchParams({
+      token: this.cookieService.get("LoginCookie")
+    });
     return this.http.post<number>(
-      `http://localhost:3000/tasks/batch`,
+      `http://localhost:3000/tasks/batch?${params}`,
       tasks
     );
   }
@@ -364,8 +421,11 @@ export class dbDAO {
   */
 
   public updateTasksBatch(tasks: Task[]): Observable<number> {
+    const params = new URLSearchParams({
+      token: this.cookieService.get("LoginCookie")
+    });
     return this.http.post<number>(
-      `http://localhost:3000/tasks/updateBatch`,
+      `http://localhost:3000/tasks/updateBatch?${params}`,
       tasks
     );
   }
@@ -381,8 +441,11 @@ export class dbDAO {
   */
 
   public createLinksBatch(links: Link[]): Observable<number> {
+    const params = new URLSearchParams({
+      token: this.cookieService.get("LoginCookie")
+    });
     return this.http.post<number>(
-      `http://localhost:3000/links/batch`,
+      `http://localhost:3000/links/batch?${params}`,
       links
     );
   }
@@ -437,7 +500,10 @@ export class dbDAO {
   */
   
   updateCalendarConfig(config: CalendarConfig): Observable<number>{
-    return this.http.post<number>('http://localhost:3000/calendar/config/update',
+    const params = new URLSearchParams({
+      token: this.cookieService.get("LoginCookie")
+    });
+    return this.http.post<number>(`http://localhost:3000/calendar/config/update?${params}`,
       config
     );
   }
@@ -452,11 +518,13 @@ export class dbDAO {
   */
 
   deleteProyectByPid(pid: number): Observable<number> {
-    const params = new HttpParams().set('pid', pid.toString());
+    const params = new URLSearchParams({
+      pid: pid.toString(),
+      token: this.cookieService.get("LoginCookie")
+    });
     return this.http
       .delete<{ deletedCount: number }>(
-        'http://localhost:3000/proyect/delete',
-        { params }
+        `http://localhost:3000/proyect/delete?${params}`
       )
       .pipe(map(res => res.deletedCount));
   }
@@ -486,9 +554,12 @@ export class dbDAO {
 
 
   public deleteTasksByPid(pid: number): Observable<number> {
-    const params = new HttpParams().set('pid', pid.toString());
+    const params = new URLSearchParams({
+      pid: pid.toString(),
+      token: this.cookieService.get("LoginCookie")
+    });
     return this.http
-      .delete<any>(`http://localhost:3000/tasks`, { params })
+      .delete<any>(`http://localhost:3000/tasks?${params}`)
       .pipe(map(res => res.deletedCount));
   }
 
@@ -501,9 +572,12 @@ export class dbDAO {
    * 
   */
   public deleteLinksByPid(pid: number): Observable<number> {
-    const params = new HttpParams().set('pid', pid.toString());
+    const params = new URLSearchParams({
+      pid: pid.toString(),
+      token: this.cookieService.get("LoginCookie")
+    });
     return this.http
-      .delete<any>(`http://localhost:3000/links`, { params })
+      .delete<any>(`http://localhost:3000/links?${params}`)
       .pipe(map(res => res.deletedCount));
   }
 
@@ -516,8 +590,11 @@ export class dbDAO {
   */
 
   public async GetProyects(): Promise<CalendarEvent[] | undefined>{
+    const params = new URLSearchParams({
+      token: this.cookieService.get("LoginCookie")
+    });
 
-    let data = await fetch("http://localhost:3000/proyects");
+    let data = await fetch(`http://localhost:3000/proyects?${params}`);
 
     let proyects: Proyect[]= (await data.json()) as Proyect[];
      
@@ -549,11 +626,15 @@ export class dbDAO {
   */
 
   public deleteTemplateByTid(tid: number): Observable<number> {
-    const params = new HttpParams().set('tid', tid.toString());
+   
+    const params = new URLSearchParams({
+      tid: tid.toString(),
+      token: this.cookieService.get("LoginCookie")
+    });
+
     return this.http
       .delete<{ deletedCount: number }>(
-        'http://localhost:3000/template/delete',
-        { params }
+        `http://localhost:3000/template/delete?${params}`
       )
       .pipe(map(res => res.deletedCount));
   }
@@ -581,9 +662,12 @@ export class dbDAO {
   */
 
   public deleteTemplateTasksByPid(tid: number): Observable<number> {
-    const params = new HttpParams().set('tid', tid.toString());
+    const params = new URLSearchParams({
+      tid: tid.toString(),
+      token: this.cookieService.get("LoginCookie")
+    });
     return this.http
-      .delete<any>(`http://localhost:3000/template/tasks`, { params })
+      .delete<any>(`http://localhost:3000/template/tasks?${params}`)
       .pipe(map(res => res.deletedCount));
   }
 
@@ -597,9 +681,12 @@ export class dbDAO {
   */
   
   public deleteTemplateLinksByPid(tid: number): Observable<number> {
-    const params = new HttpParams().set('tid', tid.toString());
+    const params = new URLSearchParams({
+      tid: tid.toString(),
+      token: this.cookieService.get("LoginCookie")
+    });
     return this.http
-      .delete<any>(`http://localhost:3000/template/links`, { params })
+      .delete<any>(`http://localhost:3000/template/links?${params}`)
       .pipe(map(res => res.deletedCount));
   }
 
@@ -633,16 +720,18 @@ export class dbDAO {
     /**
    * Función encargada de guardar una plantilla
    * 
-   * @param {Plantilla} template plantilla a guardar
+   * @param {Plantilla} template plantilla de proyecto a guardar
    * 
    * 
   */
 
   public async createTemplate(template: Plantilla): Promise<void> {
-  
+    const params = new URLSearchParams({
+      token: this.cookieService.get("LoginCookie")
+    });
     await lastValueFrom(
       this.http.post<number>(
-        'http://localhost:3000/templates/create',
+        `http://localhost:3000/templates/create?${params}`,
         template
       )
     );
@@ -659,8 +748,11 @@ export class dbDAO {
 
 
   public createTemplateTasksBatch(tasks: TareaPlantilla[]): Observable<number> {
+    const params = new URLSearchParams({
+      token: this.cookieService.get("LoginCookie")
+    });
     return this.http.post<number>(
-      `http://localhost:3000/template/tasks/batch`,
+      `http://localhost:3000/template/tasks/batch?${params}`,
       tasks
     );
   }
@@ -675,8 +767,11 @@ export class dbDAO {
   */
 
   public createTemplateLinksBatch(links: LinkPlantilla[]): Observable<number> {
+    const params = new URLSearchParams({
+      token: this.cookieService.get("LoginCookie")
+    });
     return this.http.post<number>(
-      `http://localhost:3000/template/links/batch`,
+      `http://localhost:3000/template/links/batch?${params}`,
       links
     );
   }
@@ -714,7 +809,12 @@ export class dbDAO {
 
   public async GetTemplateTasks(id: number): Promise<TareaPlantilla[]>{
 
-    let data = await fetch("http://localhost:3000/template/tasks?tid=" + id);
+    const params = new URLSearchParams({
+      tid: id.toString(),
+      token: this.cookieService.get("LoginCookie")
+    });
+
+    let data = await fetch(`http://localhost:3000/template/tasks?${params}`);
     let tasks = await data.json();
     let parsedTasks: TareaPlantilla [] = [];
     tasks.forEach((task: any) => {
@@ -744,7 +844,12 @@ export class dbDAO {
 
   public async GetTemplateLinks(id: number): Promise<LinkPlantilla[]>{
 
-    let data = await fetch("http://localhost:3000/template/links?tid=" + id);
+    const params = new URLSearchParams({
+      tid: id.toString(),
+      token: this.cookieService.get("LoginCookie")
+    });
+
+    let data = await fetch(`http://localhost:3000/template/links?${params}`);
     let Links = await data.json();
     let parsedLinks: LinkPlantilla[] = [];
     Links.forEach((link: any) => {

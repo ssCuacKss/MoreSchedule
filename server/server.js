@@ -5,13 +5,13 @@
  * almacenados en una base de datos. tambine realiza calculos cíclicos que liberan al cliente de ese tipo de cargas
  * Autor: Pablo Roldan Pueba <i92ropup@uco.es>
  * Fecha de creación: 30/04/2025
- * Última modificación: 18/08/2025
+ * Última modificación: 01/09/2025
  * -----------------------------------------------------------------------------------------------------------------
  */
 
 const express = require('express');
 const cors = require('cors');
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 const { isLeftHandSideExpression } = require('typescript');
 const { interval, last } = require('rxjs');
 const {format, isSaturday, isSunday} = require('date-fns')
@@ -112,6 +112,33 @@ async function main() {
         }
     }
 
+    async function checkUserPermission(userId){
+
+        try {
+            
+            const user = await db.collection('users')
+            .findOne({ 
+                _id: ObjectId.createFromHexString(userId)
+            });
+            if (!user || !user.admin) return false;
+            return true;
+
+        } catch (err) {
+            return false;
+        }
+
+    }
+
+
+    /**
+     * DEPRECATED
+     * función middleware para traducción de id de proyecto en cadena a numero
+     * 
+     * @param next siguiente middleware a ejecutar tras finalizar
+     * @param req contenido de la request de la URI
+     * @param res respuesta a la request realizar por un usuario
+     * 
+    */
 
 
     function parsePid(req, res, next) {
@@ -832,6 +859,11 @@ async function main() {
 
     app.delete('/proyect/delete', async (req, res) => {
 
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
+
         const pid = parseInt(req.query.pid, 10);
         if (isNaN(pid)) {
             return res
@@ -853,6 +885,10 @@ async function main() {
      */
 
     app.post('/proyect/create', async (req, res) =>{
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         const toInsert = {id: req.body.id, start: req.body.start, end: req.body.end, title: req.body.title, color: req.body.color};
         
         try{
@@ -873,6 +909,10 @@ async function main() {
      */
 
     app.get('/proyect', async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         const pid = parseInt(req.query.pid, 10)
         if(isNaN(pid)){
             res.status(500).json({error: 'pid no válido o faltante'})
@@ -896,6 +936,10 @@ async function main() {
      */
 
     app.delete('/tasks', parsePid, async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         const result = await db.collection('tasks').deleteMany({ pid: req.pid });
         res.json({ deletedCount: result.deletedCount });
     });
@@ -907,6 +951,10 @@ async function main() {
      */
     
     app.delete('/links', parsePid, async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         const result = await db.collection('links').deleteMany({ pid: req.pid });
         res.json({ deletedCount: result.deletedCount });
     });
@@ -919,6 +967,10 @@ async function main() {
      */
 
     app.get('/users', async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         try {
             const users = await db
             .collection('users')
@@ -938,6 +990,10 @@ async function main() {
      */
 
     app.delete('/user/delete', async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         try{
             const result = await db.collection('users').deleteOne({ uname: req.query.uname.toString().trim() });
             return res.status(200).json({ deletedCount: result.deletedCount });
@@ -954,6 +1010,10 @@ async function main() {
     */
 
     app.post('/user/update', async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         const { user, update } = req.body;
 
         const isValidUser = (u) =>
@@ -1001,10 +1061,10 @@ async function main() {
     app.get('/users/auth', async (req, res) => {
         const { uname, pass } = req.query;
         if (!uname || !pass) return res.status(400).end();
-            const regex= [
+        const regex= [
             /(?=.*[A-Z])(?=.*[0-9]).{4,}/,
             /^[a-z]+$/
-            ]
+        ];
         try {
             if(!regex[1].test(uname.toString().trim()) || !regex[0].test(pass.toString().trim())){ return res.status(400).end()}
             const user = await db.collection('users')
@@ -1022,12 +1082,35 @@ async function main() {
     });
 
     /**
+     * GET
+     * Obtiene un usuario dadas sus credenciales
+     * @returns {boolean} comprobante de autoridad de usuario mediante token
+    */
+
+    app.get('/users/token/auth', async (req, res) => {
+        const token = req.query.token;
+
+        let authorization = await checkUserPermission(token).then(e => e);
+
+        if(!authorization){
+            return res.status(403).json({authorization: false});
+        }
+        return res.status(200).json({authorization: true});
+        
+    });
+
+
+    /**
      * POST
      * crea un usuario en la base de datos dadas sus credenciales
      * @returns void
     */
 
     app.post('/users/create', async (req, res)=>{
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         const regex= [
             /(?=.*[A-Z])(?=.*[0-9]).{4,}/,
             /^[a-z]+$/
@@ -1097,6 +1180,11 @@ async function main() {
     */
 
     app.get('/proyects', async (req, res) => {
+
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         
         try {
             const proyects = await db
@@ -1117,6 +1205,10 @@ async function main() {
     */
 
     app.get('/tasks', async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         const pid = parseInt(req.query.pid);
         if (isNaN(pid)) {
             return res.status(400).json({ error: 'pid inválido o faltante' });
@@ -1140,6 +1232,10 @@ async function main() {
     */
 
     app.get('/links', async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         const pid = parseInt(req.query.pid);
         if(isNaN(pid)){
             return res.status(400).json({error: 'pid inválido o faltante'});
@@ -1163,8 +1259,14 @@ async function main() {
     */
 
     app.post('/tasks/batch', async (req, res) => {
+
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         
         const tasks = req.body;
+        
         if (!Array.isArray(tasks) || tasks.length === 0) {
             return res.status(400).json({ error: 'Se espera un array no vacío de tareas' });
         }
@@ -1222,6 +1324,10 @@ async function main() {
     */
 
     app.post('/tasks/updateBatch', async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         const tasks = req.body;
         if (!Array.isArray(tasks) || tasks.length === 0) {
             return res.status(400).json({ error: 'Se espera un array no vacío de tareas' });
@@ -1254,12 +1360,7 @@ async function main() {
                 pid:        t.pid,
                 id:         t.id,
                 text:       t.text,
-                //start_date: t.start_date,
-                //duration:   t.duration,
-                //details:    t.details ?? "",
-                //offtime:    t.offtime,
-                //slack: t.slack,   <-- INTENCIONALMENTE OMITIDO
-                //slack_used: t.slack_used,
+                details:    t.details ?? "",
                 progress:   t.progress,
                 users:      t.users
             }));
@@ -1291,6 +1392,10 @@ async function main() {
 
 
     app.post('/links/batch', async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         const links = req.body;
         if (!Array.isArray(links) || links.length === 0) {
             return res
@@ -1346,6 +1451,12 @@ async function main() {
     */
 
     app.get('/calendar/config', async (req, res) =>{
+        
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
+        
         try{
             const result = await db.collection('calendarConfig').find().toArray();
             return res.status(200).json(result[0]);
@@ -1364,7 +1475,11 @@ async function main() {
 
 
     app.post('/calendar/config/update', async (req, res) => {
-    const newConfig = req.body;
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
+        const newConfig = req.body;
         try {
             // Eliminamos cualquier documento anterior
             await db.collection('calendarConfig').deleteMany({});
@@ -1393,6 +1508,10 @@ async function main() {
     */
 
     app.post('/templates/create', async (req, res) =>{
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         const toInsert = {id: req.body.id, end: req.body.end, title: req.body.title};
         
         try{
@@ -1413,6 +1532,10 @@ async function main() {
     */
 
     app.delete('/template/delete', async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         const tid = parseInt(req.query.tid, 10);
         if (isNaN(tid)) {
             return res
@@ -1434,6 +1557,10 @@ async function main() {
     */
 
     app.get('/templates', async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         
         try {
             const templates = await db
@@ -1454,6 +1581,10 @@ async function main() {
     */
 
     app.get('/template', async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         const pid = parseInt(req.query.tid, 10)
         if(isNaN(pid)){
             res.status(500).json({error: 'tid no válido o faltante'})
@@ -1477,6 +1608,10 @@ async function main() {
     */
 
     app.get('/template/tasks', async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         const pid = parseInt(req.query.tid);
         if (isNaN(pid)) {
             return res.status(400).json({ error: 'tid inválido o faltante' });
@@ -1500,6 +1635,10 @@ async function main() {
     */
 
     app.get('/template/links', async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         const pid = parseInt(req.query.tid);
         if (isNaN(pid)) {
             return res.status(400).json({ error: 'tid inválido o faltante' });
@@ -1521,6 +1660,10 @@ async function main() {
      * @returns "{ deletedCount: N }"
     */
     app.delete('/template/tasks', async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         
         let tid = parseInt(req.query.tid);
         if(isNaN(tid)){
@@ -1537,6 +1680,10 @@ async function main() {
      * @returns "{ deletedCount: N }"
     */
     app.delete('/template/links', async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         
         let tid = parseInt(req.query.tid);
         if(isNaN(tid)){
@@ -1553,6 +1700,10 @@ async function main() {
     */
 
     app.post('/template/tasks/batch', async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         
         const tasks = req.body;
         if (!Array.isArray(tasks) || tasks.length === 0) {
@@ -1602,6 +1753,10 @@ async function main() {
     */
 
     app.post('/template/links/batch', async (req, res) => {
+        let permission = await checkUserPermission(req.query.token).then(e => e);
+        if(!permission){
+            return res.status(403).json({error: "usuario sin permisos para realizar la operación"});
+        }
         const links = req.body;
         if (!Array.isArray(links) || links.length === 0) {
             return res

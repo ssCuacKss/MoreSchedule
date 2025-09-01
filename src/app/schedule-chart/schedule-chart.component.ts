@@ -4,7 +4,7 @@
  * Descripción: Componente encargado de la vista de visualización y modificación de proyectos y plantillas en tablas gantt.
  * Autor: Pablo Roldan Puebla <i92ropup@uco.es>
  * Fecha de creación: 19/04/2025
- * Última modificación: 21/08/2025
+ * Última modificación: 01/09/2025
  * ------------------------------------------------------------------------------------------------------------
  */
 
@@ -203,6 +203,12 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
   */
 
   async ngOnInit(): Promise<void>{
+
+    if(!this.cookie.get('LoginCookie').valueOf()){
+      let auth = await this.dbDao.getAuth().then(e => e);
+      console.log(auth);
+      if (auth.authorization) this.router.navigate(['/']);
+    }
     
     if(this.mode === "verProyecto"){
       this.initateGanttForViewProyect();
@@ -415,7 +421,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
     gantt.attachEvent('onLightbox', taskId => { 
       const task = gantt.getTask(taskId);
-      const userCount = task["users"].length;
+      const userCount = task["users"].length ?? 0;
       //console.log(userCount);
       const section = gantt.getLightboxSection(`Operario 1`);
       const foundLabels = Array.from(section.node.parentElement?.querySelectorAll("label") || []) as HTMLLabelElement[];
@@ -594,7 +600,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
   constructor() {
 
-   if(this.cookie.get('LoginCookie').valueOf() !== 'ALLOWEDTOLOGIN'){
+   if(!this.cookie.get('LoginCookie').valueOf()){
       this.router.navigate(['/']);
     }
 
@@ -698,7 +704,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     }
 
     for (let i = 0; i < links.length; i++) {
-      console.log(links[i].source != LinkList[i].source, links[i].target != LinkList[i].target)
+      //console.log(links[i].source != LinkList[i].source, links[i].target != LinkList[i].target)
       if (
         links[i].source != LinkList[i].source ||
         links[i].target != LinkList[i].target
@@ -773,7 +779,7 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
           });*/ 
           
         } catch (err) {
-          console.error('Error al subir cambios:', err);
+          //console.error('Error al subir cambios:', err);
         }
       }
     }

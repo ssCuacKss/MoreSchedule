@@ -5,7 +5,7 @@
  * y el menú de acciones.
  * Autor: Pablo Roldan Puebla <i92ropup@uco.es>
  * Fecha de creación: 20/04/2025
- * Última modificación: 18/08/2025
+ * Última modificación: 01/09/2025
  * ------------------------------------------------------------------------------------------------------------
  */
 
@@ -454,9 +454,6 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
   constructor(){
     registerLocaleData(localeEs);
-    if(this.cookie.get('LoginCookie').valueOf() !== 'ALLOWEDTOLOGIN'){
-      this.router.navigate(['/'])
-    }
 
   }
 
@@ -515,6 +512,12 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
   */
 
   async ngOnInit(): Promise<void> {
+
+    if(!this.cookie.get('LoginCookie').valueOf()){
+      let auth = await this.dbDao.getAuth().then(e => e);
+      console.log(auth);
+      if (auth.authorization) this.router.navigate(['/']);
+    }
 
     await this.refreshData();
     this.timerID = window.setInterval(async() => {
