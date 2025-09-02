@@ -513,10 +513,12 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
   async ngOnInit(): Promise<void> {
 
-    if(!this.cookie.get('LoginCookie').valueOf()){
+    if(this.cookie.get('LoginCookie').valueOf()){
       let auth = await this.dbDao.getAuth().then(e => e);
-      console.log(auth);
-      if (auth.authorization) this.router.navigate(['/']);
+      //console.log(auth);
+      if (!auth.authorization) this.router.navigate(['/']);
+    }else{
+      this.router.navigate(['/']);
     }
 
     await this.refreshData();
@@ -612,7 +614,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
   public goToProyectSchedule(event: CalendarEvent): void {
 
-    this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: event.id, name: event.title}});
+    this.router.navigate(['/proyectSchedule'],{queryParams:{title: 'verProyecto', id: event.id, name: event.title}});
 
   }
 
@@ -1401,7 +1403,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
     await this.dbDao.createTemplate(plantilla);
 
-    this.router.navigate(['/proyectSchdedule'], {queryParams:{id: plantilla.id ,title: "EditarPlantilla"}});
+    this.router.navigate(['/proyectSchedule'], {queryParams:{id: plantilla.id ,title: "EditarPlantilla"}});
 
   }
 
@@ -1424,7 +1426,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
   */
 
   public editarPlantilla(plantilla: Plantilla){
-    this.router.navigate(['/proyectSchdedule'], {queryParams:{id: plantilla.id ,title: "EditarPlantilla"}});
+    this.router.navigate(['/proyectSchedule'], {queryParams:{id: plantilla.id ,title: "EditarPlantilla"}});
   }
   
   /**
@@ -1508,7 +1510,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
 
     this.events.push(calendarEvent);
     this.events = [...this.events];
-    this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: ProyectToSave.id, name: ProyectToSave.title}});
+    this.router.navigate(['/proyectSchedule'],{queryParams:{title: 'verProyecto', id: ProyectToSave.id, name: ProyectToSave.title}});
 
     }
     else{
@@ -1526,7 +1528,7 @@ export class ScheduleCalendarComponent implements OnInit, OnDestroy{
   */
 
   public goToUserTask(tarea: any){
-    this.router.navigate(['/proyectSchdedule'],{queryParams:{title: 'verProyecto', id: tarea.pid, name: "", tarea: tarea.tid}});
+    this.router.navigate(['/proyectSchedule'],{queryParams:{title: 'verProyecto', id: tarea.pid, name: "", tarea: tarea.tid}});
   }
 
     /**

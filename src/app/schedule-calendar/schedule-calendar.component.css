@@ -313,7 +313,7 @@
   padding: 1.5rem;
 }
 
-/*Reglas para la visualización de la plantilla de configuración de calendario*/
+/*Reglas para la visualización la configuración de calendario*/
 
 .workHours {
   display: grid;
@@ -420,7 +420,7 @@
   text-decoration: underline red 1px;
 }
 
-/*reglas para la plantilla de creación de usuario*/
+/*reglas para la presentación de creación de usuario*/
 
 .formulario{
   display: flex;
@@ -511,7 +511,7 @@ input[type="submit"]:active{
   transition: .3s;
 }
 
-/*Reglas para la visualización de la plantilla editar datos de usuario*/
+/*Reglas para la visualización y edición de datos de usuario*/
 
 
 
@@ -769,7 +769,7 @@ input[type="submit"]:active{
 
 
 .templateSelect.selectedTemplate {
-  border: 2px solid #ef4444;   
+  border: 2px solid #3b82f6;   
   background-color: #fff5f5;  
   border-radius: 6px; 
 }

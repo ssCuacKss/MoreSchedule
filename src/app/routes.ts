@@ -25,7 +25,7 @@ const routeConfig: Routes = [
     },
     {
         //ruta para la página de la tabla gantt de edición o visualización de proyectos y plantillas, carca el componente ScheduleChartComponent
-        path:'proyectSchdedule',
+        path:'proyectSchedule',
         component: ScheduleChartComponent,
         title: 'MoreScheduler'
     },

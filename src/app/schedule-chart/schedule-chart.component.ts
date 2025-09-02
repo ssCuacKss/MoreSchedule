@@ -4,11 +4,11 @@
  * Descripción: Componente encargado de la vista de visualización y modificación de proyectos y plantillas en tablas gantt.
  * Autor: Pablo Roldan Puebla <i92ropup@uco.es>
  * Fecha de creación: 19/04/2025
- * Última modificación: 01/09/2025
+ * Última modificación: 02/09/2025
  * ------------------------------------------------------------------------------------------------------------
  */
 
-import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject, AfterViewInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ElementRef, ViewChild, ViewEncapsulation, inject, AfterViewInit, OnDestroy} from '@angular/core';
 import { gantt } from 'dhtmlx-gantt';
 import { dbDAO } from '../dbDAO';
 import { ActivatedRoute, Router} from '@angular/router';
@@ -204,10 +204,12 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
 
   async ngOnInit(): Promise<void>{
 
-    if(!this.cookie.get('LoginCookie').valueOf()){
+    if(this.cookie.get('LoginCookie').valueOf()){
       let auth = await this.dbDao.getAuth().then(e => e);
-      console.log(auth);
-      if (auth.authorization) this.router.navigate(['/']);
+      //console.log(auth);
+      if (!auth.authorization) this.router.navigate(['/']);
+    }else{
+      this.router.navigate(['/']);
     }
     
     if(this.mode === "verProyecto"){
@@ -504,9 +506,59 @@ export class ScheduleChartComponent implements OnInit, AfterViewInit, OnDestroy 
     gantt.config.round_dnd_dates = false;
     gantt.config.min_duration = 1 * 60 * 1000;
 
+    gantt.config.layout = {
+    css: "gantt_container",
+    cols: [
+        {
+            width: 300,
+            minWidth: 200,
+            maxWidth: 600,
+ 
+            
+            rows: [
+                { view: "grid", scrollX: "gridScroll", scrollable: true, 
+                    scrollY: "scrollVer" 
+                }, 
+                { view: "scrollbar", id: "gridScroll" } 
+            ]
+        },
+        { resizer: true, width: 1 },
+        {
+            rows: [
+                { view: "timeline", scrollX: "scrollHor", scrollY: "scrollVer" },
+                { view: "scrollbar", id: "scrollHor" }
+            ]
+        },
+        { view: "scrollbar", id: "scrollVer" }
+    ]
+};
+
     gantt.config.columns= [
-      {name: "text", label: "Titulo", align: "left", width: 150},
-      {name: "slack", label: "holgura (mins)", align: "center", width: 120},
+      {name: "text", label: "Titulo", align: "left", width: 170},
+      {name: "slack", label: "holgura (mins)", align: "center", width: 110, template: (task)=>{
+        const id = task.id as number;
+        const realTask = this.data.find((task:Task) => {
+          if(id === task.id){
+            return true;
+          }
+          return false;
+        });
+        return realTask?.slack;
+      }},
+      {name: "slack", label: "holgura usada", align: "center", width: 110, template: (task)=>{
+        const id = task.id as number;
+        const realTask = this.data.find((task:Task) => {
+          if(id === task.id){
+            return true;
+          }
+          return false;
+        });
+        return realTask?.slack_used;
+      }},
+      {name: "progress", label: "progreso", align: "center", width: 80, template:(task)=>{
+          return `${((task.progress ?? 0)*100).toFixed(2)}`
+        }
+      }
     ];
 
 
