@@ -1083,8 +1083,8 @@ async function main() {
 
     /**
      * GET
-     * Obtiene un usuario dadas sus credenciales
-     * @returns {boolean} comprobante de autoridad de usuario mediante token
+     * Comprueba si un token de usuario tiene permiso para realizar operaciones. 
+     * @returns {authorization: boolean} comprobante de autoridad de usuario mediante token
     */
 
     app.get('/users/token/auth', async (req, res) => {
