@@ -1,59 +1,24 @@
 # MoreSchedule
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 19.0.2.
+Repositorio del código fuente del trabajo fin de grado para el grado de ingeniería informática en la UCO.
 
-## Development server
+El proyecto listo para despliegue como aplicación web se puede descargar desde [ este enlace](https://github.com/ssCuacKss/MoreSchedule/releases/tag/AngularBuildApplicatoin). La instalación puede realizarse según aparece en el manual de usuario.
 
-To start a local development server, run:
+Para una instalación para pruebas y desarrollo se deben seguir los pasos en la sección de **Instalación para desarrollo**
 
-```bash
-ng serve
+## Instalación para desarrollo
+
+Se debe instalar el entorno NodeJS e instalar las dependencias requeridas por el proyecto (entradas en *package.json*), para instalar el entorno node en tu equipo, puedes obtenerlo desde el [enlace de descarga oficial](https://nodejs.org/es/download). En equipos Linux se puede optar alternativamente por buscar la disponibilidad del software en el gestor de paquetes del que disponga la distribución e instalar desde ahí.
+
+Con el entorno establecido descargar el framework angular mediante el gestor de paquetes de NodeJS (npm) mediante el comando en la interfaz gráfica: 
+
+```
+npm install -g @angular/cli@19
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+## Documentación
 
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
-```bash
-ng generate --help
-```
-
-## Building
-
-To build the project run:
-
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
-
-```bash
-ng test
-```
 
 ## Running end-to-end tests
 
-For end-to-end (e2e) testing, run:
 
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
